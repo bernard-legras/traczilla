@@ -177,7 +177,7 @@ contains
                      ! be defined at this stage)
       print *,'start time loop'  
 
-      trace_time=.true.
+      trace_time=.false.
       dotime: do itime=itime0,ideltas,lsynctime
   
 !       print *,'timemanager> itime, loutnext, npproc', itime, loutnext0, npproc 
