@@ -458,6 +458,8 @@ contains
 !              B. Legras, September 2012
 !              tests for pcut and thetacut
 !              MERRA mode, B. Legras, March 2013
+!              test for thetalowcut
+!              B. Legras, September 2013
 !                                                                              *
 !*******************************************************************************
 !                                                                              *
@@ -680,10 +682,18 @@ contains
             nstop=4
           endif
         else
-          if (p0*(tint/z)**(1/kappa) > pcut) then
-            nstop=4
-          else if (z > thetacut) then
-            nstop=5
+          if (TTLFILLactiv) then
+            if (z<thetalowcut) then 
+              nstop=4
+            else if (z>thetacut) then
+              nstop=5
+            endif
+          else 
+            if (p0*(tint/z)**(1/kappa) > pcut) then
+              nstop=4
+            else if (z > thetacut) then
+              nstop=5
+            endif
           endif
         endif
       endif

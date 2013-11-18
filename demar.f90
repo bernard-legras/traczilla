@@ -516,6 +516,8 @@ contains
     launch_int,         & ! launch interval (s)
     pcut,               & ! pressure threshold to stop trajectories (Pa)
     thetacut,           & ! theta top boundary to stop trajs (K)   
+    TTLFILLactiv,       & ! activate low theta cut and deactivate pcut
+    thetalowcut,        & ! low theta cut
     n_sample,           & ! sample size per point
     uniform_spread,     & ! activate uniform spread
     uniform_mesh,       & ! activate the uniform mesh in longitude
@@ -636,6 +638,7 @@ contains
  case ('AGEF')
     print *,'readreleases> AGEF'
     AGEFactiv=.true.
+    TTLFILLactiv=.false.
     numpoint=1
     theta_l=0.
     pcut=25000.

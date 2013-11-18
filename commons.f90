@@ -278,7 +278,7 @@ module commons
       real mesh_size_lat, mesh_size_long
       logical switch_diff_off
       integer delay_switch_diff_off
-      logical TTLactiv, AccurateTemp, AGEFactiv
+      logical TTLactiv, AccurateTemp, AGEFactiv, TTLFILLactiv
       logical delayed_initialization, press2theta, theta2press
       logical uniform_spread
       real, allocatable :: lat_list(:)
@@ -286,7 +286,7 @@ module commons
       integer curtain_type
       real lev1,lev2,inclev
       real uppertheta
-      real pcut,thetacut
+      real pcut,thetacut, thetalowcut
       
       integer npart(maxpoint)
       character(len=12):: release_plan
