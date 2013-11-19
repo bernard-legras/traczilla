@@ -110,7 +110,6 @@ OBJECTS2 = misc.o uvip3p.o random.o
 $(MAIN): $(OBJECTS0) $(OBJECTS1) $(OBJECTS2)
 	$(FC) *.o -o $(MAIN) $(FFLAGS) $(LDFLAGS1)
 $(OBJECTS1): $(OBJECTS0)
-m_ctrper.mod: m_mrgrnk.mod
 
 .PHONY : clean
 clean:
