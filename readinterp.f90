@@ -1,7 +1,7 @@
 
 !**********************************************************************
-! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013           *
-! Andreas Stohl, Bernard Legras                                       *
+! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013            *
+! Andreas Stohl, Bernard Legras, Ann'Sophe Tissier                    *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
 !                                                                     *
@@ -1002,7 +1002,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
           vvh(i,j,nlev_ec-k+2,n) = zsec4(nxfield*(ny-j-1)+i+1)
         enddo       ; enddo
       case (133)              !! SPEC. HUMIDITY 
-        if(TTLactiv) then
+        if(TTLactiv .or. CLAUSactiv) then
           do j=0,ny-1 ; do i=0,nxfield-1
             qvh(i,j,nlev_ec-k+2,n) = max(zsec4(nxfield*(ny-j-1)+i+1),0.)
           enddo       ; enddo
@@ -1144,7 +1144,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
         uuh(nx-1,:,:,n)=uuh(0,:,:,n)
         vvh(nx-1,:,:,n)=vvh(0,:,:,n)        
         tth(nx-1,:,:,n)=tth(0,:,:,n)
-        if(TTLactiv) qvh(nx-1,:,:,n)=qvh(0,:,:,n)
+        if(TTLactiv .or. CLAUSactiv) qvh(nx-1,:,:,n)=qvh(0,:,:,n)
         if(z_motion) wwh(nx-1,:,:,n)=wwh(0,:,:,n)
       endif
 
@@ -1206,7 +1206,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 
       uuh(:,:,1,n)=u10(:,:,1,n)
       vvh(:,:,1,n)=v10(:,:,1,n)
-      if(TTLactiv) qvh(:,:,1,n)=qvh(:,:,2,n)
+      if(TTLactiv .or. CLAUSactiv) qvh(:,:,1,n)=qvh(:,:,2,n)
       tth(:,:,1,n)=tt2(:,:,1,n)
 
       if(iumax/=nuvz-1) stop 'READWIND: NUVZ NOT CONSISTENT'

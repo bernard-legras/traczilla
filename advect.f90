@@ -1,6 +1,6 @@
 !**********************************************************************
 ! Copyright 1996, i1997, 2001, 2002, 2006, 2007, 2012, 2013           *
-! Andreas Stohl, Bernard Legras                                       *
+! Andreas Stohl, Bernard Legras, Ann'Sophie Tissier                   *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
 !                                                                     *
@@ -18,7 +18,6 @@
 ! along with TRACZILLA.  If not, see <http://www.gnu.org/licenses/>.  *
 !**********************************************************************
 
-!$Id: 
 !
 !###############################################################################
 !----------------------------------- ADVECT ------------------------------------
@@ -138,7 +137,7 @@ contains
          print *,minval(shuffle),maxval(shuffle)
       endif
       
-      if (TTLactiv) then
+      if (TTLactiv.or.CLAUSactiv) then
 ! Allocate arrays for temperature and saturation mixing ratio
         print *,'timemanager> allocate ttra1 and qtra1'
         if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
@@ -221,18 +220,28 @@ contains
             call fixlayerpart(error)
             if(error) stop 'ERROR in fixlayerpart for' &
                            //' delayed initialization'
+          else if (CLAUSactiv) then
+            call fixparticlesCLAUS(error)
+            if(error) stop 'ERROR in fixparticlesCLAUS for' &
+                           //' delayed initialization'
           else
             stop 'NO OPTION FOR DELAYED INITIALIZATION'
           endif
-          if(TTLactiv) then
+          if(TTLactiv.or.CLAUSactiv) then
             qtra1=0.05
           endif
+        endif
+        if(itime==itime0 .and. TTLactiv) then
+           ! fake time step
+           do j=1,numpart
+             call advanceB(j,itime,0.,nstop,xtra1(j),ytra1(j),ztra1(j),ttra1(j))
+           enddo
         endif
 
 ! Output of particle positions
          
         if((itime == loutnext0).and.(ipout == 1)) then
-          if (TTLactiv) then
+          if (TTLactiv.or.CLAUSactiv) then
             call partout_qv(itime)
        !     print *, &
        !       'output of particle positions, T and qv, format 103 ', &

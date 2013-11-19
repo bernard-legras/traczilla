@@ -560,6 +560,7 @@ contains
     campaign              ! name of the campaign
  namelist /CLAUS/       &
     Claus_dir,          & ! CLAUS directory
+    iedate_Claus, ietime_Claus, & ! ending date and time (YYYYMMDD, HHMISS) for the released parcels
     diabatic_Claus,     & ! if .true., pressure levels; if .false. z levels
     TB_max,             & ! maximum brightness temperature (Kelvin) of the released parcel (top cloud)
     latmin_Claus,       & ! minimum latitude where it can exist a released parcel at the initial time
@@ -573,6 +574,7 @@ contains
  TTLactiv=.false.
  AGEFactiv=.false.
  shuffling=.false.
+ CLAUSactiv=.false.
    
 ! Open the releases file and read user options
 !---------------------------------------------
@@ -910,16 +912,29 @@ contains
  
  ! Releases particles at the top of clouds in the tropics
  case('CLAUS')
+    CLAUS_dir='/data/atissier/flexpart_in/CLAUS_TBmax/'
+    iedate_Claus = 20050707
+    ietime_Claus = 235959
+    diabatic_Claus=.true.
+    TB_max=230
+    latmin_Claus=-20
+    latmax_Claus=40
     thetacut=380.
+    delayed_initialization=.true.
+    AccurateTemp=.true.
+
     read(unitreleases,CLAUS)
     CLAUSactiv = .true.
     write(6,CLAUS)
     print *,'readreleases> CLAUS'
+    print *,'readreleases> iedate_Claus ', iedate_Claus
+    print *,'readreleases> ietime_Claus ', ietime_Claus
     print *,'readreleases>',Claus_dir
     print *,'readreleases> diabatic_Claus ',diabatic_Claus
     print *,'readreleases> TB_max ',TB_max
     print *,'readreleases> latmin_Claus ',latmin_Claus
     print *,'readreleases> latmax_Claus ',latmax_Claus
+    print *,'readreleases> thetacut ',thetacut
     
  case default
    error=.true.
@@ -1292,6 +1307,7 @@ end subroutine readreleasesB2
                  lev=lev+inclev
                enddo
              enddo
+             print *,'fixlayerpart > numpart after make_curtain ',numpart
           endif 
 
         else  
@@ -1316,6 +1332,7 @@ end subroutine readreleasesB2
              endif
              !-----------        
           enddo
+          print *,'fixlayerpart > numpart for reg grid ',numpart
         endif
 ! set vertical positions and initialise time
         do j=numparti,numpart          
@@ -2909,7 +2926,7 @@ end subroutine readreleasesB2
   !@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FIXPARTICLESCLAUS @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
   !=====|==1=========2=========3=========4=========5=========6=========7=========8
   
-  subroutine fixparticlesTBClaus(error)
+  subroutine fixparticlesClaus(error)
     !*******************************************************************************
     !                                                                              *
     !     This routine fixes the release times and release locations of all        *
@@ -2962,6 +2979,10 @@ end subroutine readreleasesB2
 
     ok_Claus = 1
 
+    ! Check input date :
+    call check_input_date_Claus(error)
+    if(error) return
+
     ! Determination de la date du premier lancer :
     call date_first_release()
 
@@ -2973,77 +2994,6 @@ end subroutine readreleasesB2
     ! Conversion Tb, latitude, longitude, etc. en chaine de caracteres
     ! pour les titres de fichier
     call conversion_string()
-
-
-    ! Loop on time : ibdate -> iedate
-
-    ! Lire chacun des fichiers une fois la premiere variable pour savoir 
-    ! combien de particules totales on va avoir
-    ! somme sur cette premiere variable donne numpart et verifier 
-    ! si cela ne depasse pas le nombre de particules totales
-
-    ! Deuxieme boucle sur le temps pour remplir les vecteurs
-
-    ! http://fortran.developpez.com/faq/?page=section6
-
-
-    !-------------------------------------------------------------------
-    !------------ Premiere lecture pour determiner numpart -------------
-    !-------------------------------------------------------------------
-
-    ! Premier temps :
-    yeartrac = ibyeartrac
-    monthtrac = ibmonthtrac
-    daytrac = ibdaytrac
-    hourtrac = ibhourtrac
-
-    fulldate_Claus = yeartrac*10**(6) + monthtrac*10**(4) + daytrac*10**(2) + hourtrac
-    write(fulldate_Claus_string,'(i10)') fulldate_Claus
-    filename = fulldate_Claus_string//'_Tb'//Tbmax_string//'_lat'//latmin_string//latmax_string
-
-    numpart_prev = 0
-    do while(ok_claus.EQ.1)
-       ! Test d'existence du fichier a lire :
-       ! on utilise une variable logique
-       inquire( file=trim(Claus_dir)//yearstring_short//'/'//filename, exist=test_exist)
-       if( .NOT. test_exist) go to 998
-
-       ! Lecture du fichier : juste la premiere variable pour connaitre le nombre de particules
-       open(UNIT=unitCLAUS, FILE=trim(Claus_dir)//yearstring_short//'/'//filename, &
-            FORM="unformatted", ACCESS="sequential", &
-            ACTION="read", POSITION="rewind", &
-            IOSTAT=ios )
-       if(ios /=0) go to 996
-       read(UNIT=unitCLAUS, IOSTAT=ios) numpart_date
-       if(ios /=0) go to 997
-       numpart_prev = numpart_prev + numpart_date !somme sur le nombre de particules
-       close(UNIT=unitCLAUS)     
-
-       if(fulldate_Claus .EQ. fulldate_Claus_end) then 
-          ! il n'y a plus de donnees Claus a lire
-          ok_claus=0
-       else
-          ! Passage a l'heure suivante :
-          hourtrac = hourtrac + 3 ! data every 3 hours for Claus
-          call newdate()
-
-          ! Prochain filename a lire :
-          fulldate_Claus = yeartrac*10**(6) + monthtrac*10**(4) + daytrac*10**(2) + hourtrac
-          write(fulldate_Claus_string,'(i10)') fulldate_Claus
-          filename = fulldate_Claus_string//'_Tb'//Tbmax_string//'_lat'//latmin_string//latmax_string
-
-       endif ! if(fulldate_Claus_string.EQ.fulldate_Claus_string_end)
-    Enddo !do while(ok_claus.EQ.1)
-
-    numpart = numpart_prev
-    write(*,*)
-    write(*,*) 'number of particles numpart=',numpart
-
-    if(numpart>maxpart) goto 994
-
-    !-----------------------------------------------------------------
-    !----------- Deuxieme lecture pour remplir les tableaux ----------
-    !-----------------------------------------------------------------
 
     ! Lecture et stockage des donnees :
     ok_claus = 1
@@ -3060,6 +3010,10 @@ end subroutine readreleasesB2
     filename = fulldate_Claus_string//'_Tb'//Tbmax_string//'_lat'//latmin_string//latmax_string
 
     do while(ok_claus.EQ.1)
+       ! Test d'existence du fichier a lire :
+       ! on utilise une variable logique
+       inquire( file=trim(Claus_dir)//yearstring_short//'/'//filename, exist=test_exist)
+       if( .NOT. test_exist) go to 998
 
        ! Lecture du fichier : juste la premiere variable pour connaitre le nombre de particules
        open(UNIT=unitCLAUS, FILE=trim(Claus_dir)//yearstring_short//'/'//filename, &
@@ -3085,7 +3039,7 @@ end subroutine readreleasesB2
        read(UNIT=unitCLAUS, IOSTAT=ios) temppart
        if(ios /=0) go to 997
 
-       close(UNIT=unitCLAUS)     
+       close(UNIT=unitCLAUS)
 
        ! Computing the time to release the particle
        do ipart = 1,numpart_date ! in forward calculation 
@@ -3094,6 +3048,10 @@ end subroutine readreleasesB2
           ir_start(ipart) = int((juldate(start_date,start_time)-bdate)*86400.)
        enddo
 
+       ! Check initialisation :
+       do ipart = 1,numpart_date
+         if(temppart(ipart)>TB_max) go to 1000
+       enddo
 
        ! Calcul de la coordonnee verticale :
        if(diabatic_Claus) then
@@ -3107,23 +3065,32 @@ end subroutine readreleasesB2
        ! Copie dans les tableaux finaux :
        do ipart = 1,numpart_date
           numpart_prev = numpart_prev +1
-          xtra1(numpart_prev) = modulo((xpart(ipart)-xlon0)/dx,nx)
-          ytra1(numpart_prev) = (ypart(ipart)-ylat0)/dy
-          if(diabatic_Claus) then 
+          xtra1(numpart_prev) = modulo((xpart(ipart)-xlon0)/dx,real(nx))
+          ytra1(numpart_prev) = (ypart(ipart)-ylat0)/real(dy)
+          ttra1(numpart_prev) = temppart(ipart)
+          if(diabatic_Claus) then
              ztra1(numpart_prev) = thetapart(ipart)
           else
              ztra1(numpart_prev) = zpart(ipart)
           endif
           itra1(numpart_prev) = ir_start(ipart)
+          !if(numpart_prev==1148648) then
+          !  write(*,*) 'fixparticlesCLAUS'
+          !  write(*,*) 'numpart_prev = 1148648'
+          !  write(*,*) 'ttra1=',thetapart(ipart)*(p0/presspart(ipart))**(-kappa)
+          !  write(*,*) 'xtra1=',xtra1(numpart_prev)
+          !  write(*,*) 'ytra1=',ytra1(numpart_prev)
+          !  write(*,*) 'ztra1=',thetapart(ipart)
+          !  write(*,*) 'presspart=',presspart(ipart)
+          !endif
        enddo
-
        ! Deallocation des tableaux intermediaires
        deallocate(xpart,ypart,presspart,temppart)
        deallocate(thetapart,zpart)
        deallocate(ir_start)
 
 
-       if(fulldate_Claus .EQ. fulldate_Claus_end) then 
+       if(fulldate_Claus .EQ. fulldate_Claus_end) then
           ! il n'y a plus de donnees Claus a lire
           ok_claus=0
        else
@@ -3140,12 +3107,13 @@ end subroutine readreleasesB2
 
     enddo
 
-    if(numpart_prev.NE.numpart) go to 999
+    numpart = numpart_prev
+    write(*,*)
+    write(*,*) 'number of particles numpart=',numpart
 
+    if(numpart>maxpart) goto 994
 
-
-
-    return   ! subroutine principale : fixparticlesTBClaus
+    return   ! subroutine principale : fixparticlesClaus
 
     ! ---------------------------------
     ! ----- Affichage des erreurs -----
@@ -3199,12 +3167,54 @@ end subroutine readreleasesB2
     write(*,*) '#####################################################'
     return
 
+1000 error=.true.
+     write(*,*) '#####################################################'
+     write(*,*) '#### FLEXPART MODEL SURBROUTINE FIXPARTICLES     ####'
+     write(*,*) '####                                             ####'
+     write(*,*) '#### ERROR : temperature > TB_max                ####'
+     write(*,*) '#####################################################'
 
     ! ----------------------------------
     ! ---------- Contains --------------
     !-----------------------------------
 
   contains
+
+    subroutine check_input_date_Claus(error)
+      logical, intent(inout) :: error
+
+      if(iedate < iedate_Claus) go to 9998
+      if(iedate.EQ.iedate_Claus) then
+         if(ietime<=ietime_Claus) go to 9998
+      endif
+
+      if(ibdate > iedate_Claus) go to 9999
+      if(ibdate.EQ.iedate_Claus)then
+         if(ibtime>=ietime_Claus) go to 9999
+      endif
+
+      return ! subroutine check_input_date_Claus
+
+9998  error=.true.
+      write(*,*) ' ################################################# '
+      write(*,*) ' #### FLEXPART MODEL ERROR! CLAUS ENDING DATE #### '
+      write(*,*) ' #### IS LARGER THAN ENDING DATE. CHANGE      #### '
+      write(*,*) ' #### CLAUS ENDING DATE IN FILE "RELEASES"    #### '
+      write(*,*) ' ################################################# '
+      return
+
+9999  error=.true.
+      write(*,*) ' ################################################# '
+      write(*,*) ' #### FLEXPART MODEL ERROR! CLAUS ENDING DATE #### '
+      write(*,*) ' #### IS SMALLER THAN BEGINNIG DATE. CHANGE   #### '
+      write(*,*) ' #### CLAUS ENDING DATE IN FILE "RELEASES"    #### '
+      write(*,*) ' ################################################# '
+      return
+
+    end subroutine check_input_date_Claus
+
+    ! -------------------------
+    ! -------------------------
 
 
     subroutine date_first_release()
@@ -3233,12 +3243,13 @@ end subroutine readreleasesB2
          ibdaytrac = ibdaytrac + 1
       endif
 
-      if((ibyeartrac<1997).OR.(ibyeartrac>2007)) then
+      if((ibyeartrac<1997).OR.(ibyeartrac>2009)) then
          stop('check ibdate to use Claus data')
       endif
 
       tab_day_month = (/31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/)
-      if((ibyeartrac.EQ.2000) .OR. (ibyeartrac.EQ.2004)) then
+      if((ibyeartrac.EQ.2000) .OR. (ibyeartrac.EQ.2004) .OR. &
+         (ibyeartrac.EQ.2008) ) then
          tab_day_month(2) = 29
       endif
       if(ibdaytrac>tab_day_month(ibmonthtrac)) then
@@ -3263,11 +3274,11 @@ end subroutine readreleasesB2
 
     subroutine date_last_release()
 
-      ieyeartrac = int(aint(real(iedate)*10.0**(-4)))
-      iemonthtrac = int(aint(real(iedate-ieyeartrac*10**(4))*10.0**(-2)))
-      iedaytrac = int(aint(real(iedate-ieyeartrac*10**(4)-iemonthtrac*10**(2))))
+      ieyeartrac = int(aint(real(iedate_Claus)*10.0**(-4)))
+      iemonthtrac = int(aint(real(iedate_Claus-ieyeartrac*10**(4))*10.0**(-2)))
+      iedaytrac = int(aint(real(iedate_Claus-ieyeartrac*10**(4)-iemonthtrac*10**(2))))
       ! Determination de l'heure du dernier lancer :
-      iehourtrac = int(aint(real(ietime)*10.0**(-4)))
+      iehourtrac = int(aint(real(ietime_Claus)*10.0**(-4)))
 
       do while(mod(iehourtrac,3).NE.0) ! data every 3 hours for Claus
          iehourtrac = iehourtrac-1
@@ -3353,7 +3364,7 @@ end subroutine readreleasesB2
 
     end subroutine newdate
 
-  end subroutine fixparticlesTBClaus
+  end subroutine fixparticlesClaus
 
 
 end module demar  

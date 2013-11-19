@@ -485,6 +485,14 @@ subroutine interpol_wind_theta   &
       tol = 0.001
       nbunmix=0
       theta_col(x,y,ind) = .true.
+      if(debug_out) then
+        write(*,*) 'dans calc_col_theta'
+        write(*,*) 'x=',x
+        write(*,*) 'y=',y
+        write(*,*) 'k=',k
+        write(*,*) 'ind=',ind
+        write(*,*) 'tth(x,y,lower_theta_level:upper_theta_level,ind)=',tth(x,y,lower_theta_level:upper_theta_level,ind)
+      endif
       allocate (theta_diff(1:upper_theta_level-lower_theta_level))
       theta_diff = theta_g(lower_theta_level+1:upper_theta_level,x,y,ind) &
                  - theta_g(lower_theta_level:upper_theta_level-1,x,y,ind)

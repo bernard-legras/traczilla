@@ -223,7 +223,11 @@
            call fix_perturb
            call alloc_Lyapunov
         case('CLAUS')
-           call fixparticlesTBClaus(error)
+            if(delayed_initialization) then
+              print *,'flexpart> delayed initialization'
+           else
+              call fixparticlesClaus(error)
+           endif
         end select
       endif
       if (error) goto 999
@@ -275,7 +279,7 @@
          allocate (ps(0:nx-1,0:ny-1,1,2),tt2(0:nx-1,0:ny-1,1,2))
          allocate (u10(0:nx-1,0:ny-1,1,2),v10(0:nx-1,0:ny-1,1,2))
          ! if needed according to the release plan
-         if(TTLactiv) then
+         if(TTLactiv .or. CLAUSactiv) then
             print *,'alloc_3D qvh'
             allocate (qvh(0:nx-1,0:ny-1,nuvz,2))
          endif

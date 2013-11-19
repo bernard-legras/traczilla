@@ -248,7 +248,7 @@ contains
 
       outfmt=103        ! Output format
       lhead = 6         ! Header length (# of lines)
-      nbuf=100000
+      nbuf=300000
       open(unitpartout,file=trim(path(2))//'part_'//trim(chour),  &
           form='unformatted')
       call writesngl(unitpartout,(/ lhead, outfmt /))
