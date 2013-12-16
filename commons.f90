@@ -1,7 +1,7 @@
 
 !**********************************************************************
-! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013           *
-! Andreas Stohl, Bernard Legras                                       *
+! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013            *
+! Andreas Stohl, Bernard Legras, Ann'Sophie Tissier                   *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
 !                                                                     *
@@ -97,7 +97,7 @@ module commons
 !*********************************************
 
 !     parameter(nxmax=361,nymax=181,nuvzmax=51,nwzmax=51) ! 1 degree 51 levels
-      integer, parameter :: nxmax=361,nymax=181,nuvzmax=92,nwzmax=92 ! 1 degree 61 levels
+      integer, parameter :: nxmax=361,nymax=181,nuvzmax=92,nwzmax=92 ! 1 degree 92 levels
 !     parameter(nxmax=721,nymax=181,nuvzmax=61,nwzmax=61) ! 1/2 degre 61 levels
 
 
@@ -123,7 +123,7 @@ module commons
 !**************************************************************
 
 !     integer, parameter :: maxpart=60000000,maxpoint=50,maxspec=1
-      integer, parameter :: maxpart=600000,maxpoint=50,maxspec=1
+      integer, parameter :: maxpart=3000000,maxpoint=50,maxspec=1
       integer, parameter :: maxwf=150000,maxtable=1000,numclass=9,ni=11
 
 ! maxpart                 Maximum number of particles
@@ -451,6 +451,7 @@ integer len_diab(2)
 !*********************************
    integer,parameter      ::  unitCLAUS = 85                
    character(len=100)     ::  Claus_dir
+   integer                ::  iedate_Claus, ietime_Claus
    logical                ::  diabatic_Claus, CLAUSactiv
    integer                ::  TB_max
    integer                ::  latmin_Claus
