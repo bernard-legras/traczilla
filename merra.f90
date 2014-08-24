@@ -825,7 +825,7 @@ end subroutine alloc_merra
 ! Output of the mass averaged diab heating
   if(mean_diab_output) then
     write(unitflux) memtime_diab(m),mean_w(nuvz-NPMass+1:nuvz)
-    call flush(unitflux)
+    flush(unitflux)
   endif
 
   deallocate(theta,sigma,mean_sigma)
@@ -1432,10 +1432,10 @@ subroutine interpol_wind_merra &
       
       subroutine check_merra_data(n)
       integer, intent(in) :: n
-      integer :: ix,jy,k,indz,um,vm,tm,count,count_miss
+      integer :: ix,jy,k,indz,um,vm,tm,count_c,count_miss
       
 !      print *,'check_merra_data'
-      count=0
+      count_c=0
       count_miss=0
       do ix=0,nx-2
          do jy=0,ny-1
@@ -1451,14 +1451,14 @@ subroutine interpol_wind_merra &
 !           um=int(sum(uuh(ix,jy,indz+2:,n),mask=uuh(ix,jy,indz+2:,n)==missing_value)/missing_value)
 !           vm=int(sum(vvh(ix,jy,indz+2:,n),mask=vvh(ix,jy,indz+2:,n)==missing_value)/missing_value)
 !           tm=int(sum(tth(ix,jy,indz+2:,n),mask=tth(ix,jy,indz+2:,n)==missing_value)/missing_value)
-           count=count+1
+           count_c=count_c+1
            if (um>0) then
 !              write(*,'("overmiss ",6I8,)')indz,ix,jy,um
               count_miss=count_miss+1
            endif
          enddo
       enddo
-      write(*,'("check_merra_data",f6.2,"%")'),100.*count_miss/count      
+      write(*,'("check_merra_data",f6.2,"%")'),100.*count_miss/count_c      
       return
       end subroutine check_merra_data
 
