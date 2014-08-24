@@ -457,6 +457,7 @@ end subroutine alloc_ecmwf_diab
         if(count110==0) go to 889
 !        print *,'read_diab> file ',wfname_diab(indj), count110
       endif
+      !print *,count100,count101,count110
 
       return    
 888   write(*,*) ' #### FLEXPART MODEL ERROR! DIABFIELD         #### ' 
@@ -871,7 +872,7 @@ end subroutine alloc_ecmwf_diab
 ! Output of the ass averaged diab heating
   if(mean_diab_output) then
     write(unitflux) memtime_diab(m),mean_w(nuvz-NPureP+1:nuvz)
-    call flush(unitflux)
+    flush(unitflux)
   endif
 
 ! Correction step
@@ -1049,7 +1050,7 @@ subroutine interpol_wind_theta_diab   &
 
       !if(ix < 0) then
       !  print *,ix,jy,xt
-      !  call flush(6)
+      !  flush(6)
       !endif
 
       if(.not.theta_col(ix,jy,memind(1)))   call calc_col_theta(ix,jy,memind(1))

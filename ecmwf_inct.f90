@@ -784,7 +784,7 @@ end subroutine alloc_ecmwf_inct
 ! Output of the ass averaged diab heating
   if(mean_diab_output) then
     write(unitflux2) memtime_inct(m),mean_w(nuvz-NPureP+1:nuvz)
-    call flush(unitflux2)
+    flush(unitflux2)
   endif
 
 ! Correction step
