@@ -166,6 +166,8 @@ contains
         mass_triad_b(1:numpart_np) = exp(-ztra1(1:numpart_np))
         !--------
       endif
+ 
+      flush 6
 
 !**********************************************************************
 ! Loop over the whole modelling period in time steps of mintime seconds
@@ -262,7 +264,7 @@ contains
             call savsav(itime)
             print *,'full backup of trajectories ',itime
           endif
-          call flush(6)
+          flush (6)
         endif                                   ! interval, not at the end
  
 ! Calculate Lyapunov exponents: TO BE UPDATED WITH I. PISSO CODE
