@@ -201,7 +201,11 @@
            if (error) goto 999
            call fixparticlesB(error)
         case('AGEF')
-          call fixmultilayer(error)
+          if(external_pos0) then
+            call setpos0fromext
+          else
+            call fixmultilayer(error)
+          endif
         case('MOZAIC')
            if(interp_release) then
               call fixmozaicinterp(error)
