@@ -4,22 +4,13 @@
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
-TARGET=X64
-#TARGET=P7
+TARGET=X64-par-ng
 HOME=/home/legras
-#TARGET=XP
 
 SHELL = /bin/bash
 FC       = pgf95
 CC	= pgcc
 
-ifeq ($(TARGET),XP)
-  MAIN = TRACZILLA-XP
-  FFLAGS  = -tp athlonxp -fast -Mvect=sse -Minfo -Mextend -byteswapio -Bstatic
-  CFLAGS  = -tp athlonxp -fast -Mvect=sse
-#  LDFLAGS1 = -L/usr/local32/lib -lgrib
-  LDFLAGS1 = -L$(HOME)/lib.i586 -lgribex-px -lcom
-endif
 ifeq ($(TARGET),AMD64-88)
   MAIN = TRACZILLA-D
   CFLAGS = -msse -m64 -DAMD64
@@ -51,16 +42,23 @@ ifeq ($(TARGET),AMD64-44)
   LDFLAGS1 = -L$(HOME)/lib.amd64 -lgribex -lcom
 endif
 ifeq ($(TARGET),X64-par)
-  MAIN = TRACZILLA-TT-par-test
+  MAIN = TRACZILLA-TT-par
   CC = pgcc
-  #CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
   CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
-  #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
-  #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,ovf -Mcache_align -Msmartalloc
   #FFLAGS = -I$(HOME)/local/include -gopt -mp -Mbounds -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  # include needed for netcdf.mod
   FFLAGS = -I$(HOME)/local/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
   #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
   LDFLAGS1 = -rpath $(HOME)/local/lib.x64 -L$(HOME)/local/lib.x64 -lgribex -lcom -lnetcdf -lnetcdff
+endif
+ifeq ($(TARGET),X64-par-ng)
+  MAIN = TRACZILLA-TT-par-ng
+  CC = pgcc
+  CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
+  # include needed for netcdf.mod
+  FFLAGS = -I$(HOME)/local-ng/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib -L$(HOME)/local-ng/lib -lgribex -lcom -lnetcdf -lnetcdff
 endif
 ifeq ($(TARGET),X64)
   MAIN = TRACZILLA-TT
