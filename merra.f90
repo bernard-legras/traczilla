@@ -1,4 +1,3 @@
-
 !**********************************************************************
 ! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013            *
 ! Andreas Stohl, G. Wotawa, Bernard Legras                            *
@@ -1408,15 +1407,15 @@ subroutine interpol_wind_merra &
         id=id1(1)+1
         if(id==2) then
           theta_g(lower_theta_level,x,y,ind)= &
-                  theta_g(lower_theta_level+1,x,y,ind)-2*tol
+                  theta_g(lower_theta_level+1,x,y,ind)-2.2*tol
         else
-          theta_g(lower_theta_level+id-2,x,y,ind)= &
-                  theta_g(lower_theta_level+id-1,x,y,ind)-2*tol
+          theta_g(lower_theta_level+id-1,x,y,ind)= &
+                  theta_g(lower_theta_level+id-1,x,y,ind)-1.1*tol
 !              min((2*theta_g(lower_theta_level+id-3,x,y,ind) &
 !                    +theta_g(lower_theta_level+id,x,y,ind))/3., &
 !                  theta_g(lower_theta_level+id-1,x,y,ind)-2*tol)
-          theta_g(lower_theta_level+id-1,x,y,ind)= &
-                  theta_g(lower_theta_level+id-2,x,y,ind)+2*tol
+          theta_g(lower_theta_level+id,x,y,ind)= &
+                  theta_g(lower_theta_level+id,x,y,ind)+1.1*tol
 !              max((theta_g(lower_theta_level+id-3,x,y,ind) &
 !                +2*theta_g(lower_theta_level+id,x,y,ind))/3., &
 !                  theta_g(lower_theta_level+id-2,x,y,ind)+2*tol) 
