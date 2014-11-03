@@ -39,7 +39,7 @@ module commons
 
       implicit none
  
-      integer, parameter:: dp=kind(0.0),sp=kind(0.0)
+      integer, parameter:: dbl=kind(0.d0),dp=kind(0.0),sp=kind(0.0)
       
 !********************************************************
 ! Number of threads used in parallel sections of the code
@@ -188,7 +188,7 @@ module commons
 !****************************************************************
 
       character(len=128):: path(numpath)
-      integer len_path(numpath)
+      integer :: len_path(numpath)
 
 ! path                    path names needed for trajectory model
 ! len_path                length of path names needed for trajectory model
@@ -198,9 +198,9 @@ module commons
 ! Variables defining the general model run specifications
 !********************************************************
 
-      integer ibdate,ibtime,iedate,ietime,hrstart,itime0
-      double precision bdate,edate
-      logical command_old,releases_old,restart,perpetual,shuffling
+      integer :: ibdate,ibtime,iedate,ietime,hrstart,itime0
+      real (dbl) :: bdate,edate
+      logical :: command_old,releases_old,restart,perpetual,shuffling
       character(len=4):: vert_interpol
 
 
@@ -218,14 +218,14 @@ module commons
 ! shuffling               controls whether the parcels are treated in order or shuffled
 
 
-      integer ldirect,ideltas
+      integer :: ldirect,ideltas
 
 ! ldirect                 1 for forward, -1 for backward simulation
 ! ideltas                 length of trajectory loop from beginning to
 !                         ending date (s)
 
-      integer loutstep,loutaver,loutsample,method,lsynctime,loffset,loffset2
-      logical savfull
+      integer :: loutstep,loutaver,loutsample,method,lsynctime,loffset,loffset2
+      logical :: savfull
 
 ! loffset [s]             offset time for the first output (useful if it is
 !                         not a multiple of loutstep)
@@ -238,9 +238,9 @@ module commons
 ! method                  indicator which dispersion method is to be used
 ! savfull		  makes backups of the trajectories in full resolution
 
-      real ctl,fine
-      integer ifine,iout,ipout,ipin,iflux
-      logical turbswitch
+      real (dp) :: ctl,fine
+      integer :: ifine,iout,ipout,ipin,iflux
+      logical :: turbswitch
 
 ! ctl      factor, by which time step must be smaller than Lagrangian time scale
 ! ifine    reduction factor for time step used for vertical wind
@@ -252,12 +252,12 @@ module commons
 ! fine     float(ifine)
 ! turbswitch              determines how the Markov chain is formulated
 
-      integer mintime,itsplit
+      integer :: mintime,itsplit
 
 ! mintime                 minimum time step to be used by FLEXPART
 ! itsplit                 time constant for splitting particles
 
-      integer lsubgrid,lconvection,lagespectra
+      integer :: lsubgrid,lconvection,lagespectra
 
 ! lsubgrid     1 if subgrid topography parameterization switched on, 2 if not
 ! lconvection  1 if convection parameterization switched on, 0 if not
@@ -272,24 +272,26 @@ module commons
       character(len=45):: compoint(maxpoint)
       integer numpoint,ireleasestart(maxpoint),ireleaseend(maxpoint)
       integer ireleaseinterval(maxpoint)
-      real xpoint1(maxpoint),ypoint1(maxpoint)
-      real xpoint2(maxpoint),ypoint2(maxpoint)
-      real zpoint1(maxpoint),zpoint2(maxpoint)
-      real mesh_size_lat, mesh_size_long
-      logical switch_diff_off
-      integer delay_switch_diff_off
-      logical TTLactiv, AccurateTemp, AGEFactiv, TTLFILLactiv, external_pos0
-      logical delayed_initialization, press2theta, theta2press
-      logical uniform_spread
-      real, allocatable :: lat_list(:)
-      logical make_curtain, make_layer, make_uni3D, uniform_mesh
-      integer curtain_type
-      real lev1,lev2,inclev
-      real uppertheta
-      real pcut,thetacut, thetalowcut
+      real (dp) :: xpoint1(maxpoint),ypoint1(maxpoint), &
+                   xpoint2(maxpoint),ypoint2(maxpoint), &
+                   zpoint1(maxpoint),zpoint2(maxpoint)
+      real (dp) :: mesh_size_lat, mesh_size_long
+      logical :: switch_diff_off
+      integer :: delay_switch_diff_off
+      logical :: TTLactiv, AccurateTemp, AGEFactiv, TTLFILLactiv, AGEBactiv
+      logical :: delayed_initialization, press2theta, theta2press
+      logical :: uniform_spread
+      real (dp), allocatable :: lat_list(:)
+      logical :: make_curtain, make_layer, make_uni3D, uniform_mesh
+      integer :: curtain_type
+      real (dp) :: lev1,lev2,inclev
+      real (dp) :: uppertheta
+      real (dp) :: pcut,thetacut, thetalowcut
       
-      integer npart(maxpoint)
+      integer :: npart(maxpoint)
       character(len=12):: release_plan
+      
+      integer :: max_life_time
 
       
 
@@ -335,7 +337,7 @@ module commons
 ! or isentropic motion (see also headings of isentrop.f90)
 !***********************************************************
 
-     logical z_motion
+      logical z_motion
 
 ! z_motion                use z=ln(p0/p) as vertical coordinate
 !                         and interpolate wind to z level
@@ -345,8 +347,8 @@ module commons
 ! (see also headings of ecmwf_diab, ecmwf_inct, merra
 !***********************************************************
 		
-logical clear_sky, cloud_sky
-logical mass_correction, mean_diab_output
+      logical clear_sky, cloud_sky
+      logical mass_correction, mean_diab_output
 
 ! clear_sky		  Use of clear sky tendency (LW+SW)
 ! cloud_sky               Use of cloud sky radiative tendency (LW+SW) no latent
@@ -355,8 +357,8 @@ logical mass_correction, mean_diab_output
 !                         such that mean mass flux is zero across this surface
 ! mean_diab_output	  output of the mean mass flux before correction	
 
-integer numbwf_diab,wftime_diab(maxwf),lwindinterv_diab
-character(len=11):: wfname_diab(maxwf),wfspec_diab(maxwf)
+      integer numbwf_diab,wftime_diab(maxwf),lwindinterv_diab
+      character(len=11):: wfname_diab(maxwf),wfspec_diab(maxwf)
 
 ! lwindinterv_diab [s]    Interval between wind fields currently in memory
 ! numbwf_diab             actual number of wind fields
@@ -365,19 +367,19 @@ character(len=11):: wfname_diab(maxwf),wfspec_diab(maxwf)
 ! wfspec_diab(maxwf)      specifications of wind field file, e.g. if on hard 
 !                         disc or on tape
 
-integer memtime_diab(2),memind_diab(2)
+      integer memtime_diab(2),memind_diab(2)
 
 ! memtime_diab [s]        validation times of wind fields in memory
 ! memind_diab             pointer to wind field, in order to avoid shuffling
 !                         of wind fields
 
-real, allocatable :: w_diab(:,:,:,:)
+      real, allocatable :: w_diab(:,:,:,:)
 
 ! w_diab [K/s]            vertical velocity as tendency in potential temperature
  
 	
-character(len=128):: path_diab(2)
-integer len_diab(2)
+      character(len=128):: path_diab(2)
+      integer len_diab(2)
 
 ! path_diab               paths for diabatic directory and associated AVAILABLE file
 ! len_diab                lengths of the two previous strings
@@ -430,34 +432,56 @@ integer len_diab(2)
 ! diftype: diffusion type. 1: in z; 2: in pot. temp.
 ! nsample
 
-       real diffus
-       logical verdiff,hordiff
-       integer diftype
-       integer nsample(maxpoint),numlevel(maxpoint)
+      real diffus
+      logical verdiff,hordiff
+      integer diftype
+      integer nsample(maxpoint),numlevel(maxpoint)
+       
+!*****************************************
+! Variables associated with the tropopause
+!*****************************************
+
+! tropodir: directory containing the tropopause data
+! packet_len: length of the packets initialized on a 
+! grid masked by the tropopause (une value for each 
+! launch date)
+! tropoyy: year of the active tropopause file
+
+      character (len=128):: tropodir
+      integer, allocatable :: packet_len(:)
+      integer :: tropoyy
+      integer, parameter :: tropunit=55
+      logical :: tropopen
        
 !*****************************************
 ! Variables associated with MOZAIC and ER2  flights
 !*****************************************
 
-       integer start_index, end_index, n_sample, n_loc
-       character(len=48)::  MOZAIC_filename, ER2_day
-       character(len=128):: MOZAIC_dir, ER2_dir
-       character(len=12):: index_type, campaign
-       logical instant_release,interp_release
-       real start_ER2time, end_ER2time
+      integer start_index, end_index, n_sample, n_loc
+      character(len=48)::  MOZAIC_filename, ER2_day
+      character(len=128):: MOZAIC_dir, ER2_dir
+      character(len=12):: index_type, campaign
+      logical instant_release,interp_release
+      real start_ER2time, end_ER2time
 
 !*********************************
 ! Variables associated with CLAUS 
 !*********************************
-   integer,parameter      ::  unitCLAUS = 85                
-   character(len=100)     ::  Claus_dir
-   integer                ::  iedate_Claus, ietime_Claus
-   logical                ::  diabatic_Claus, CLAUSactiv
-   integer                ::  TB_max
-   integer                ::  latmin_Claus
-   integer                ::  latmax_Claus
-   
+      integer,parameter      ::  unitCLAUS = 85                
+      character(len=100)     ::  Claus_dir
+      integer                ::  iedate_Claus, ietime_Claus
+      logical                ::  diabatic_Claus, CLAUSactiv
+      integer                ::  TB_max
+      integer                ::  latmin_Claus
+      integer                ::  latmax_Claus
 
+!**************************************
+! Variables associated with parcel kill
+!**************************************
+      
+      logical :: track_kill
+      real (dp), allocatable :: x_kill(:),y_kill(:),z_kill(:)
+      integer, allocatable   :: it_kill(:), nstp_kill(:)
 
 ! Fixed fields, unchangeable with time
 !*************************************
