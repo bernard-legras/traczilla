@@ -604,6 +604,114 @@ contains
       end subroutine restartpart
 
 !===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SAVKILL @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+      
+      subroutine savkill(itime)
+
+!*******************************************************************************
+!                                                                              *
+!     Save the kill fields recording when and how the parcels have been killed *
+!                                                                              *
+!     Author: B. Legras                                                        *
+!                                                                              *
+!     30 October 2014                                                          *
+!                                                                              *
+!*******************************************************************************
+!                                                                              *
+! Variables:                                                                   *
+!                                                                              *
+!*******************************************************************************
+
+      integer, intent(in):: itime
+      integer j,outfmt,lhead
+      integer jjjjmmdd,ihmmss      
+      integer system
+
+! Output all particles in raw format  
+!*************************************
+
+      outfmt=111     ! Output format
+      lhead =6       ! Header length (# of lines)
+      open(saveunit_tmp,file=trim(path(2))//'kill_tmp', &
+         form='unformatted')
+      write(saveunit_tmp) lhead,outfmt
+      write(saveunit_tmp) numpart,
+      write(saveunit_tmp) ibdate,ibtime
+      call caldate(bdate,jjjjmmdd,ihmmss)
+      write(saveunit_tmp) jjjjmmdd,ihmmss
+      write(saveunit_tmp) itime
+      write(saveunit_tmp) ylat0,xlon0,dx,dy
+      write(saveunit_tmp) x_kill(1:numpart)
+      write(saveunit_tmp) y_kill(1:numpart)
+      write(saveunit_tmp) z_kill(1:numpart)
+      write(saveunit_tmp) it_kill(1:numpart)
+      write(saveunit_tmp) nstop_kill(1:numpart)
+      close(saveunit_tmp)
+
+! Moves the file to its true name after successful write
+
+      j=system('mv -f '//trim(path(2))//'kill_tmp'//' '    &
+                         //trim(path(2))//'kill')
+
+      return
+      end subroutine savkill
+
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ readkill @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8      
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@      
+      
+      subroutine readkill(error)
+!                          
+!*******************************************************************************
+!                                                                              *
+!     Read the kill files at the beginning of a continuation  run              *
+!     Is combined with restartfromsav
+!                                                                              *
+!     Author: B. Legras                                                        *
+!                                                                              *
+!     30 October 2014                                                          *
+!                                                                              *
+!*******************************************************************************
+!                                                                              *
+! Variables:                                                                   *
+!                                                                              *
+!*******************************************************************************
+
+      integer ibdate_arch,ibtime_arch,lhead,outfmt,idumb
+      character(len=12):: r_plan
+      logical, intent(out):: error
+
+      error=.false.
+      print *,'##### restart run ####' 
+   
+! Open the file  
+!*************************************
+
+      open(unitpartin,file=trim(path(2))//'kill', &
+         form='unformatted',status='old')
+      print *,'restart > opened file'
+      read(unitpartin) lhead, outfmt
+      read(unitpartin) 
+      read(unitpartin) 
+      read(unitpartin) 
+      read(unitpartin) 
+      read(unitpartin) 
+      if(.not.allocated(x_kill)) allocate(x_kill(numpart))
+      read(unitpartin) x_kill(1:numpart)
+      if(.not.allocated(y_kill)) allocate(y_kill(numpart))
+      read(unitpartin) y_kill(1:numpart)
+      if(.not.allocated(z_kill)) allocate(z_kill(numpart))
+      read(unitpartin) z_kill(1:numpart)
+      if(.not.allocated(it_kill)) allocate(it_kill(numpart))
+      read(unitpartin) it_kill(1:numpart)
+      if(.not.allocated(nstop_kill)) allocate(nstop_kill(numpart))
+      read(unitpartin) nstop_kill(1:numpart)
+      return
+      end subroutine readkill
+
+!===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ WRITESNGL @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 !=====|==1=========2=========3=========4=========5=========6=========7=========8
       
