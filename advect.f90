@@ -27,10 +27,10 @@
 
 module advect
 use commons
-use lyapunov, only: activ_Lyapunov, numpart_np, tau_orthog, &
-                          lambdaa, lambdab, &
-                          ortho, &
-                          mass_triad_b  !test----
+!use lyapunov, only: activ_Lyapunov, numpart_np, tau_orthog, &
+!                          lambdaa, lambdab, &
+!                          ortho, &
+!                          mass_triad_b  !test----
 use ecmwf_diab
 use ecmwf_inct
 use mass_iso
@@ -76,6 +76,8 @@ contains
 !           B. Legras 16/9/2012
 !           stopped trajs removed from npproc
 !           MERRA mode: B. Legras, March 2013
+!           B. Legras, October 2014      
+!           AGEB mode
 !*******************************************************************************
 !                                                                              *
 ! Variables:                                                                   *
@@ -96,25 +98,35 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer i,j,itime,nstop
-      integer loutnext,loutnext0
-      integer npproc,npstop(7),nb_bounce
-      integer count_clock_1,count_clock_2,count_rate,count_max
-      integer next_time_orthog, prev_time_orthog
+      integer :: i,j,itime,nstop, ix, jy
+      integer :: loutnext,loutnext0
+      integer :: npproc,npstop(7),nb_bounce
+      integer :: count_clock_1,count_clock_2,count_rate,count_max
+      integer :: next_time_orthog, prev_time_orthog
       integer, allocatable :: shuffle(:)
-      integer npproc_thread,nb_bounce_thread,npstop_thread(7),num_thread
-      real tint  
-      real dt
+      integer :: npproc_thread,nb_bounce_thread,npstop_thread(7),num_thread
+      logical :: tropotest
+      integer :: yyyymmdd,hhmmss,ytr,mtr,dtr,dyr,year_length
+      integer :: ldayscum(12)
+      character (4) :: yyyy
+      character (len=256) :: tropofile
+      real (dp), allocatable :: buff(:),tropozdd(:,:)
+      real (dp) :: ddx,ddy
+      real (dp) :: tint
+      real (dp) :: dt
+      real (dp) :: epsil=1.e-3
 !     real lambdaa(3,maxlyap), lambdab(3,maxlyap)
-!      real xm,xm1
-      logical error,trace_time
+!     real xm,xm1
+      logical :: error,trace_time, tropopen
       logical, allocatable :: mask_part(:)
       integer :: n,nb_processors,OMP_GET_THREAD_NUM
 !     external ctrper
 
       !test-----
-      real cc
+      ! real cc
       !---------
+
+      ldayscum=(/0,31,59,90,120,151,181,212,243,273,304,334/)
 
 !------------------------------------
 ! Performs further initializations   
@@ -133,8 +145,8 @@ contains
 !              j=j+1
 !           enddo
 !        enddo       
-         print *,j-numpart-1,shuffle(1:5)
-         print *,minval(shuffle),maxval(shuffle)
+!        print *,j-numpart-1,shuffle(1:5)
+!        print *,minval(shuffle),maxval(shuffle)
       endif
       
       if (TTLactiv.or.CLAUSactiv) then
@@ -144,11 +156,15 @@ contains
         if (.not.allocated(qtra1)) allocate (qtra1(maxpart))
 ! mixing ratio read if restart but here it is reinitalized
 ! mixing ratio initialized at the beginning, after each output or after restart
-        qtra1=0.05
+        qtra1=0.05_dp
       endif
 
       if (AGEFactiv.or.merra_diab) then
         if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
+      endif
+      
+      if(AGEBactiv) then
+        allocate (buff(ny*nx),tropozdd(0:nx-1,0:ny-1))
       endif     
 
 ! Initialisation of the variables controling the output
@@ -157,15 +173,16 @@ contains
 !     and also to have output at time 0 if loffset2 = -loutnext
       loutnext0 = loutnext + loffset2
       
-      if( activ_Lyapunov ) then
-        print *,'timemanager> activation of Lyapunov calculation'
-!       first orthogonalization performed at the same time as the first output
-        prev_time_orthog = 0
-        next_time_orthog = loutnext0
-        !test----
-        mass_triad_b(1:numpart_np) = exp(-ztra1(1:numpart_np))
-        !--------
-      endif
+!! Lyapunov deactivated by default
+!      if( activ_Lyapunov ) then
+!        print *,'timemanager> activation of Lyapunov calculation'
+!!       first orthogonalization performed at the same time as the first output
+!        prev_time_orthog = 0
+!        next_time_orthog = loutnext0
+!        !test----
+!        mass_triad_b(1:numpart_np) = exp(-ztra1(1:numpart_np))
+!        !--------
+!      endif
  
       flush 6
 
@@ -178,6 +195,7 @@ contains
                      ! be defined at this stage)
       print *,'start time loop'  
 
+      tropoyy=0
       trace_time=.false.
       dotime: do itime=itime0,ideltas,lsynctime
   
@@ -239,9 +257,31 @@ contains
              call advanceB(j,itime,0.,nstop,xtra1(j),ytra1(j),ztra1(j),ttra1(j))
            enddo
         endif
+        
+! Calculate date and read a new tropopause file if needed
+        if(AGEBactiv) then
+          call caldate(bdate+itime/86400._dp,yyyymmdd,hhmmss)
+          ytr=floor(yyyymmdd/10000._dp+epsil)
+          if(.not.(ytr .eq. tropoyy)) then
+            inquire(unit=tropunit,opened=tropopen)
+            if (tropopen) close(tropunit)
+            write(yyyy,'(I4)') ytr
+            tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'
+            open(tropunit,file=tropofile,access='direct',status='old', &
+              recl=4*ny*nx)
+            print *,'opening tropopause file for ',yyyy
+            tropoyy=ytr
+          endif 
+          mtr=floor(yyyymmdd/100._dp-100*ytr+epsil)
+          dtr=yyyymmdd-10000*ytr-100*mtr
+          dyr=dtr+ldayscum(mtr)
+          if (mod(ytr,4)==0 .and. mtr>2) dyr=dyr+1
+        endif       
+ 
+! Reset tropotest
+        tropotest=.false. 
 
 ! Output of particle positions
-         
         if((itime == loutnext0).and.(ipout == 1)) then
           if (TTLactiv.or.CLAUSactiv) then
             call partout_qv(itime)
@@ -253,6 +293,12 @@ contains
             call partout_agef(itime)
        !     print *,'output of particle positions and T, format 105 ', &
        !       itime/86400,' days'
+          else if (AGEBactiv) then
+            call partout_agef(itime)           
+            tropotest=.true.
+            read(tropunit,rec=dyr)buff
+            tropozdd=reshape(buff,(/nx,ny/))
+            write(*,'(" tropotest ",I4,2I2.2,I5)') ,ytr,mtr,dtr,dyr
           else
             call partout_fast(itime)           !  dump particle position
        !     print *,'output of particle positions format 102 ', &
@@ -268,36 +314,38 @@ contains
         endif                                   ! interval, not at the end
  
 ! Calculate Lyapunov exponents: TO BE UPDATED WITH I. PISSO CODE
+! deactivated by default
      
-        if( activ_Lyapunov .and. (itime == next_time_orthog) ) then
-           print *,'timemanager> Gram-Schmidt'
-           call ortho(itime)
-!	   if( prev_time_orthog == 0 ) then	  
-!	      do i = 1, numpart_np
-!	         lambda(:,i) = log / (itime-itramem(i))
-!             enddo              
-!	   else
-!	      do i = 1, numpart_np
-!	         lambda(:,i) = 0.5* (lambdaa(:,i)+lambdab(:,i)) / (itime - prev_time_orthog)
-!	      enddo
-!	   endif
-           !test----
-           do i=1,numpart_np
-             cc = 1./(itime - itramem(i))   
-             write(*,'(a,i8,i5,3G15.5)') ' Lyapunov> ',itime,i,  &
-                cc*lambdaa(1,i),cc*lambdaa(2,i),cc*lambdaa(3,i)
-             write(*,'(a,i8,i5,3G15.5)') ' Lyapunov> ',itime,i,  &
-                cc*lambdab(1,i),cc*lambdab(2,i),cc*lambdab(3,i)
-           enddo
-           mass_triad_b(1:numpart_np) = exp(-ztra1(1:numpart_np))
-           !--------
-           prev_time_orthog = itime
-           next_time_orthog = itime + tau_orthog
-           !call lambda_out(itime)
-        endif
+!        if( activ_Lyapunov .and. (itime == next_time_orthog) ) then
+!           print *,'timemanager> Gram-Schmidt'
+!           call ortho(itime)
+!!	   if( prev_time_orthog == 0 ) then	  
+!!	      do i = 1, numpart_np
+!!	         lambda(:,i) = log / (itime-itramem(i))
+!!             enddo              
+!!	   else
+!!	      do i = 1, numpart_np
+!!	         lambda(:,i) = 0.5* (lambdaa(:,i)+lambdab(:,i)) / (itime - prev_time_orthog)
+!!	      enddo
+!!	   endif
+!           !test----
+!           do i=1,numpart_np
+!             cc = 1./(itime - itramem(i))   
+!             write(*,'(a,i8,i5,3G15.5)') ' Lyapunov> ',itime,i,  &
+!                cc*lambdaa(1,i),cc*lambdaa(2,i),cc*lambdaa(3,i)
+!             write(*,'(a,i8,i5,3G15.5)') ' Lyapunov> ',itime,i,  &
+!                cc*lambdab(1,i),cc*lambdab(2,i),cc*lambdab(3,i)
+!           enddo
+!           mass_triad_b(1:numpart_np) = exp(-ztra1(1:numpart_np))
+!           !--------
+!           prev_time_orthog = itime
+!           next_time_orthog = itime + tau_orthog
+!           !call lambda_out(itime)
+!        endif
    
         if (itime == ideltas) goto 99           ! do not advect beyond final time
-
+        
+ 
 !************************
 ! Loop over all particles
 !************************
@@ -353,6 +401,26 @@ contains
 ! may generate large amount of output
 !cc         if(nstop.gt.1) print *,'stop traj ',j,xtra1(j),ytra1(j),ztra1(j)
 !------------------------------------
+
+! Apply tropopause test when due to discard parcels having crossed
+!*****************************************************************
+! Apply simultaneously the duration test to discard parcels beyond maximum life
+!****************************************************************************** 
+! It is assumed that the tropopause data have same grid as the wind
+! management of the date is done locally without the weight of 
+! the available/getfields mech
+
+            if (tropotest) then
+              ix=floor(xtra1(j))
+              jy=floor(ytra1(j))
+              ddx= xtra1(j)-ix
+              ddy= ytra1(j)-jy
+              if(ztra1(j)<tropozdd(ix,jy)*(1-ddx)*(1-ddy) &
+                         +tropozdd(ix+1,jy)*ddx*(1-ddy) &
+                         +tropozdd(ix,jy+1)*(1-ddx)*ddy &
+                         +tropozdd(ix+1,jy+1)*ddx*ddy) nstop=6
+              if (itra0(j)-itime > max_life_time) nstop=7
+            endif
 
 ! Calculate qv for final pressure and initial temperature
 !********************************************************
