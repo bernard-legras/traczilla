@@ -491,7 +491,7 @@ subroutine interpol_wind_theta   &
         write(*,*) 'y=',y
         write(*,*) 'k=',k
         write(*,*) 'ind=',ind
-        write(*,*) 'tth(x,y,lower_theta_level:upper_theta_level,ind)=',tth(x,y,lower_theta_level:upper_theta_level,ind)
+        write(*,*) 'theta_g(lower_theta_level:upper_theta_level,x,y,ind)=',theta_g(lower_theta_level:upper_theta_level,x,y,ind)
       endif
       allocate (theta_diff(1:upper_theta_level-lower_theta_level))
       theta_diff = theta_g(lower_theta_level+1:upper_theta_level,x,y,ind) &
@@ -517,15 +517,21 @@ subroutine interpol_wind_theta   &
         id=id1(1)+1
         if(id==2) then
           theta_g(lower_theta_level,x,y,ind)= &
-                  theta_g(lower_theta_level+1,x,y,ind)-2.2*tol
+                  theta_g(lower_theta_level+1,x,y,ind)-3.2*tol
         else
           theta_g(lower_theta_level+id-1,x,y,ind)= &
-                  theta_g(lower_theta_level+id-1,x,y,ind)-1.1*tol
+              min((2*theta_g(lower_theta_level+id-2,x,y,ind) &
+                    +theta_g(lower_theta_level+id,x,y,ind))/3., &
+                  theta_g(lower_theta_level+id-1,x,y,ind)-2*tol)
+!                  theta_g(lower_theta_level+id-1,x,y,ind)-1.1*tol
 !              min((2*theta_g(lower_theta_level+id-3,x,y,ind) &
 !                    +theta_g(lower_theta_level+id,x,y,ind))/3., &
 !                  theta_g(lower_theta_level+id-1,x,y,ind)-2*tol)
           theta_g(lower_theta_level+id,x,y,ind)= &
-                  theta_g(lower_theta_level+id,x,y,ind)+1.1*tol
+              max((theta_g(lower_theta_level+id,x,y,ind) &
+                +2*theta_g(lower_theta_level+id+1,x,y,ind))/3., &
+                  theta_g(lower_theta_level+id,x,y,ind)+2*tol) 
+!                  theta_g(lower_theta_level+id,x,y,ind)+1.1*tol
 !              max((theta_g(lower_theta_level+id-3,x,y,ind) &
 !                +2*theta_g(lower_theta_level+id,x,y,ind))/3., &
 !                  theta_g(lower_theta_level+id-2,x,y,ind)+2*tol) 
