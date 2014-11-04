@@ -133,7 +133,7 @@ contains
       logical error,toobig
       integer i,j,idiff,ldat,ltim
       integer year, month, day
-      double precision jul,beg,end
+      real (dbl) :: jul,beg,end
       character(len=16):: fname,spec
       character(len=16), allocatable:: wfname1(:),wfspec1(:)
       integer, allocatable:: wfldat1(:),wfltim1(:),wftime1(:)
@@ -149,11 +149,11 @@ contains
 
       if (ideltas.gt.0) then         ! forward trajectories
         beg=bdate-1.                 ! idiffmax should be used here too               
-        end=bdate+dble(float(ideltas)/86400.) &
-                 +dble(float(idiffmax)/86400.)
+        end=bdate+dble(float(ideltas)/86400._dp) &
+                 +dble(float(idiffmax)/86400._dp)
       else                           ! backward trajectories
-        beg=bdate+dble(float(ideltas)/86400.) &
-                 -dble(float(idiffmax)/86400.)
+        beg=bdate+dble(float(ideltas)/86400._dp) &
+                 -dble(float(idiffmax)/86400._dp)
         end=bdate+1.                 ! idiffmax shoukd be used here too
       endif
 
@@ -185,7 +185,7 @@ contains
         wfldat1(numbwf)=ldat
         wfltim1(numbwf)=ltim
         wfspec1(numbwf)=trim(spec)
-        wftime1(numbwf)=nint((jul-bdate)*86400.)
+        wftime1(numbwf)=nint((jul-bdate)*86400._dp)
       endif
       goto 100       ! next wind field
 
@@ -446,23 +446,26 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
         write(*,'(a,3i5)')' gridcheck> isec2(2,3,12)',isec2(2),isec2(3),isec2(12)
         nxfield=isec2(2)
         ny=isec2(3)
-        xaux1=float(isec2(5))/1000.
-        xaux2=float(isec2(8))/1000.
-        if (xaux1.ge. 180.)  xaux1=xaux1-360.0
-        if (xaux2.ge. 180.)  xaux2=xaux2-360.0
-        if (xaux1.lt.-180.001) xaux1=xaux1+360.0
-        if (xaux2.lt.-180.001) xaux2=xaux2+360.0
+        xaux1=float(isec2(5))/1000._dp
+        xaux2=float(isec2(8))/1000._dp
+        if (xaux1.ge. 180._dp)  xaux1=xaux1-360.0_dp
+        if (xaux2.ge. 180._dp)  xaux2=xaux2-360.0_dp
+        if (xaux1.lt.-180.001_dp) xaux1=xaux1+360.0_dp
+        if (xaux2.lt.-180.001_dp) xaux2=xaux2+360.0_dp
         if (xaux2.le.xaux1) xaux2=xaux2+360.  ! very important to insure xaux2>xaux1
         print *,'gridcheck> xaux1, xaux2 ',xaux1,xaux2
-        yaux1=float(isec2(7))/1000.
-        yaux2=float(isec2(4))/1000.
+        yaux1=float(isec2(7))/1000._dp
+        yaux2=float(isec2(4))/1000._dp
+        yaux1=max(-90._dp,yaux1)
+        yaux2=min(90._dp,yaux2)
         print *,'gridcheck> yaux1, yaux2 ',yaux1,yaux2
         xlon0=xaux1
         ylat0=yaux1
         dx=(xaux2-xaux1)/float(nxfield-1)  
         dy=(yaux2-yaux1)/float(ny-1)
-        dxconst=180./(dx*r_earth*pi)
-        dyconst=180./(dy*r_earth*pi)
+        print *,'gridcheck> dx dy ',dx,dy
+        dxconst=180._dp/(dx*r_earth*pi)
+        dyconst=180._dp/(dy*r_earth*pi)
         nlev_ec=isec2(12)/2-1         !  Number of (u,v) ECMWF levels
 
 ! Check whether fields are global
@@ -470,42 +473,42 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 ! projections using the stlmbr- and stcm2p-calls
 !***********************************************************
 
-        xauxa=abs(xaux2+dx-360.-xaux1) ! check that xaux2 = xaux1+360-dx
+        xauxa=abs(xaux2+dx-360._dp-xaux1) ! check that xaux2 = xaux1+360-dx
 !       defines nx such that internal longitude runs from 0 to nx-1
-        if (xauxa.lt.0.001) then
+        if (xauxa.lt.0.001_dp) then
           nx=nxfield+1                 ! field is cyclic
           xglobal=.true.               ! redondant longitude grid with nx points
         else
           nx=nxfield
           xglobal=.false.
         endif
-        xauxa=abs(yaux1+90.)
-        if (xglobal.and.xauxa.lt.0.001) then
+        xauxa=abs(yaux1+90._dp)
+        if (xglobal.and.xauxa.lt.0.001_dp) then
           sglobal=.true.               ! field contains south pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-          sizesouth=6.*(switchsouth+90.)/dy
-          call stlmbr(southpolemap,-90.,0.)
+          sizesouth=6.*(switchsouth+90._dp)/dy
+          call stlmbr(southpolemap,-90._dp,0.)
           call stcm2p(southpolemap,0.,0.,switchsouth,0.,sizesouth, &
-          sizesouth,switchsouth,180.)
+          sizesouth,switchsouth,180._dp)
           switchsouthg=(switchsouth-ylat0)/dy
         else
           sglobal=.false.
-          switchsouthg=999999.
+          switchsouthg=999999._dp
         endif
-        xauxa=abs(yaux2-90.)
-        if (xglobal.and.xauxa.lt.0.001) then
+        xauxa=abs(yaux2-90._dp)
+        if (xglobal.and.xauxa.lt.0.001_dp) then
           nglobal=.true.               ! field contains north pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-          sizenorth=6.*(90.-switchnorth)/dy
-          call stlmbr(northpolemap,90.,0.)
+          sizenorth=6._dp*(90._dp-switchnorth)/dy
+          call stlmbr(northpolemap,90._dp,0.)
           call stcm2p(northpolemap,0.,0.,switchnorth,0.,sizenorth, &
-          sizenorth,switchnorth,180.)
+          sizenorth,switchnorth,180._dp)
           switchnorthg=(switchnorth-ylat0)/dy
         else
           nglobal=.false.
-          switchnorthg=999999.
+          switchnorthg=999999._dp
         endif
         write(*,'(a,2i5,2L3)')' gribcheck> nx,ny,nglobal,sglobal ', &
            nx, ny, nglobal, sglobal
@@ -788,7 +791,6 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 ! No wind fields, which can be used, are currently in memory 
 ! -> read both wind fields
 !***********************************************************
-
          do indj=indmin,numbwf-1
             if ((ldirect*wftime(indj).le.ldirect*itime).and.   &
                   (ldirect*wftime(indj+1).gt.ldirect*itime)) then
@@ -967,14 +969,12 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
         if(isec2(3).ne.ny) stop 'READWIND: NY NOT CONSISTENT'
         if(isec2(12)/2-1.ne.nlev_ec) &
           stop 'READWIND: VERTICAL DISCRETIZATION NOT CONSISTENT'
-        xaux=float(isec2(5))/1000.
-        yaux=float(isec2(7))/1000.
+        xaux=float(isec2(5))/1000._dp
+        yaux=float(isec2(7))/1000._dp
         xaux0=xlon0
         yaux0=ylat0
-        if(xaux<0.) xaux=xaux+360.
-!       if(yaux<0.) yaux=yaux+360.           useless & confusing 
-        if(xaux0<0.) xaux0=xaux0+360.
-!       if(yaux0<0.) yaux0=yaux0+360.        useless & confusing
+        if(xaux<0.) xaux=xaux+360._dp
+        if(xaux0<0.) xaux0=xaux0+360._dp
         if(abs(xaux-xaux0)>1.e-3) then
           print *, xaux, xaux0
           stop 'READWIND: LOWER LEFT LONGITUDE NOT CONSISTENT'
