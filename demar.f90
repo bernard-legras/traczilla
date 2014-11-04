@@ -1,5 +1,5 @@
 ! *********************************************************************
-! Copyright  1996,2002,2004, 2007, 2012, 2013, 2014                         *
+! Copyright  1996,2002,2004, 2007, 2012, 2013, 2014                   *
 ! Andreas Stohl, Bernard Legras, Ann'Sophie Tissier                   *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
@@ -28,6 +28,13 @@ module demar
 use commons
 use date
 implicit none
+
+! variables local to this module
+! external source of initial positions
+logical :: external_pos0
+integer :: year_b, year_e
+character(len=256) :: external_directory
+character(len=16) :: external_type
 
 private check_launch_time, check_numpart
 private check_input_date_2, check_sample
@@ -73,6 +80,7 @@ contains
  
  character(len=72):: line
  logical error
+ real epsil
  
  namelist /COMMAND/     &
    ldirect,             & ! direction of integration
@@ -138,6 +146,7 @@ contains
 ! if new heading with COMMAND in the first line is not detected
 !--------------------------------------------------------------
 
+ epsil=1.e-3  ! must be consistent with the value in demar
  read (unitcommand,'(a)') line
  if (index(line,'COMMAND') == 0 ) then
    close(unitcommand)
@@ -239,24 +248,35 @@ contains
 
 ! Compute modeling time in seconds and beginning date in Julian date
 !-------------------------------------------------------------------
+! Notice that this estimate is wrong when 29 Febs are removed from 
+! the calendar in perpetuals or CO2 runs. It follows that the number 
+! of steps is slightly in excess. Hence the CO2 run encounter the 1st 
+! Jan 1979 boundary and terinate in error. Pertual are just overdoing 
+! by a few days.
+! In both direct and indirect mode, iedate is posterior to ibdate
+! In direct mode, edate (iedate) is posterior to bdate (ibdate)
+! In indirect mode, edate (ibdate) is anterior to bdate (iedate)
+! In direct and indirect mode, time is counted respectiveley forward 
+! and backward from 0 at bdate
+! ideltas is positive for a direct run and negative for an indirect run
  if (ldirect.eq.1) then
    bdate=juldate(ibdate,ibtime)
    edate=juldate(iedate,ietime)
-   ideltas=int((edate-bdate)*86400.)
+   ideltas=nint((edate-bdate)*86400._dbl)
  else if (ldirect.eq.-1) then
-   loutaver=-1*loutaver
-   loutstep=-1*loutstep
-   loutsample=-1*loutsample
-   lsynctime=-1*lsynctime
+   loutaver=-loutaver
+   loutstep=-loutstep
+   loutsample=-loutsample
+   lsynctime=-lsynctime
    bdate=juldate(iedate,ietime)
    edate=juldate(ibdate,ibtime)
-   ideltas=int((edate-bdate)*86400.)
+   ideltas=nint((edate-bdate)*86400._dbl)
  else
-     write(*,*) ' #### FLEXPART MODEL ERROR! DIRECTION IN      #### '
-     write(*,*) ' #### FILE "COMMAND" MUST BE EITHER -1 OR 1.  #### '
+     write(*,*) ' #### DIRECTION" MUST BE EITHER -1 OR 1  #### '
      error=.true.
      return
  endif
+ 
  print *,'readcommand > direction ',ldirect
  print *,'readcommand > ',ibdate, ibtime
  print *,'readcommand > ',iedate, ietime
@@ -443,8 +463,8 @@ contains
 !                                                                              *
 !*******************************************************************************
 
- use lyapunov, only: activ_Lyapunov, height_scale, sheet_slope, delta_ver, &
-    delta_hor, tau_orthog
+ !use lyapunov, only: activ_Lyapunov, height_scale, sheet_slope, delta_ver, &
+ !   delta_hor, tau_orthog
  use isentrop_h
  use mass_iso
  implicit none
@@ -455,8 +475,9 @@ contains
  character(len=16) :: name_station
  real long_min,long_max,lat_min,lat_max,press_l,theta_l,mesh_size
  real list_l(maxpoint)
- double precision jul1,jul2
+ real (dbl) :: jul1,jul2
  logical, intent(out):: error
+ real (dp) :: epsil
 
 ! All the namelists which can used for specific case
 
@@ -522,6 +543,28 @@ contains
     uniform_spread,     & ! activate uniform spread
     uniform_mesh,       & ! activate the uniform mesh in longitude
     external_pos0,      & ! activate reading of external files for initial position
+    external_type,      & ! type of the external initialization
+    external_directory, & ! directory in which external files must be found
+    shuffling             ! activate shuffling of parcels in timemanager
+
+ namelist /AGEB/        &
+    long_min,           & ! minimum longitude
+    long_max,           & ! maximum longitude
+    lat_min ,           & ! minimum latitude
+    lat_max ,           & ! maximum latitude
+    max_life_time,      & ! maximum life time of parcels (in y)
+    nb_level ,          & ! number of levels  
+    list_l,             & ! list of levels
+    mesh_size_lat,      & ! lat size of the mesh in degree
+    mesh_size_long,     & ! long size of the mesh in degree
+    launch_date,        & ! start launch date (yyyymmdd)
+    launch_date_end,    & ! end launch date (yyyymmdd)
+    thetacut,           & ! theta top boundary to stop trajs (K)   
+    n_sample,           & ! sample size per point
+    uniform_spread,     & ! activate uniform spread
+    uniform_mesh,       & ! activate the uniform mesh in longitude
+    tropodir,           & ! directory where to find the tropopause files
+    track_kill,		& ! track the killing of parcels
     shuffling             ! activate shuffling of parcels in timemanager
     
  namelist /AGE/         & 
@@ -578,6 +621,7 @@ contains
  shuffling=.false.
  external_pos0=.false.
  CLAUSactiv=.false.
+ track_kill=.false.
    
 ! Open the releases file and read user options
 !---------------------------------------------
@@ -599,6 +643,8 @@ contains
 !   return
 ! endif
 
+ epsil=1.e-3
+
  select case (release_plan)
 
  ! Launch particles at a given time to match an                                                                                                              
@@ -614,9 +660,9 @@ contains
     uniform_mesh=.true.
     AccurateTemp=.false.
     savfull=.false.
-    lev1 = 10.
-    lev2 = 50.
-    inclev = 1.
+    lev1 = 10._dp
+    lev2 = 50._dp
+    inclev = 1._dp
     read(unitreleases,CO2)
     write(6,CO2)
     indz=floor(lev1)
@@ -646,8 +692,8 @@ contains
     TTLFILLactiv=.false.
     numpoint=1
     theta_l=0.
-    pcut=25000.
-    thetacut=1800.
+    pcut=25000._dp
+    thetacut=1800._dp
     make_uni3D=.false.
     uniform_spread=.false.
     uniform_mesh=.false.
@@ -655,9 +701,9 @@ contains
     savfull=.true.
     nb_level=1
     long_min = xlon0
-    long_max = xlon0 + (nx-2)*dx ! global assumed
-    lat_min = -60.
-    lat_max =  60.
+    long_max = xlon0 + (nx-1)*dx ! global assumed
+    lat_min = -60._dp
+    lat_max =  60._dp
     mesh_size_lat=2 
     mesh_size_long=2
     n_sample=1
@@ -678,13 +724,56 @@ contains
         nsample(k)  = n_sample
         xpoint1(k)=long_min; xpoint2(k)=long_max
         ypoint1(k)=lat_min;  ypoint2(k)=lat_max
-        ireleasestart(k)=int((jul1-bdate)*86400.)
-        ireleaseend(k)  =int((jul2-bdate)*86400.)
+        ireleasestart(k)=nint((jul1-bdate)*86400._dbl)
+        ireleaseend(k)  =nint((jul2-bdate)*86400._dbl)
         ireleaseinterval(k)=launch_int
         nsample(k)  = n_sample
       enddo
     endif
-    uppertheta=2485.30  
+    uppertheta=2485.30_dp
+    
+ case ('AGEB')
+    print *,'readreleases> AGEB'
+    AGEBactiv=.true.
+    track_kill=.true.
+    numpoint=1
+    theta_l=0.
+    thetacut=10000._dp
+    max_life_time=10
+    make_uni3D=.false.
+    uniform_spread=.true.
+    uniform_mesh=.true.
+    AccurateTemp=.true.
+    savfull=.true.
+    nb_level=1
+    long_min = xlon0
+    long_max = xlon0 + (nx-1)*dx ! global assumed
+    lat_min = -90._dp
+    lat_max =  90._dp
+    mesh_size_lat=2._dp 
+    mesh_size_long=3._dp
+    n_sample=1
+    read(unitreleases,AGEB)
+    write(6,AGEB)
+    ! convert max_life_time from year to s
+    max_life_time=floor(365.25_dp*86400*max_life_time)
+    numpoint=nb_level
+    jul1=juldate(launch_date,120000)
+    jul2=juldate(launch_date_end,120000)
+    if (nb_level > maxpoint) then
+      go to 997
+    else
+      do k=1,nb_level
+        zpoint1(k)=list_l(k)
+        !if(z_motion) zpoint1(k)=log(p0/zpoint1(k))
+        !nsample(k)  = n_sample
+        xpoint1(k)=long_min; xpoint2(k)=long_max
+        ypoint1(k)=lat_min;  ypoint2(k)=lat_max
+      enddo
+    endif
+    uppertheta=2485.30_dp 
+    year_b=floor(launch_date/10000._dp)
+    year_e=floor(launch_date_end/10000._dp)
 
  case ('o3sonde')
     numpoint=1
@@ -694,7 +783,7 @@ contains
     ypoint1(1) = lat_station  ; ypoint2(1)=ypoint1(1)
     zpoint1(1) = p_min ; zpoint2(1) = p_max
     jul1=juldate(launch_date,launch_time)
-    ireleasestart(1) = int((jul1-bdate)*86400.)
+    ireleasestart(1) = nint((jul1-bdate)*86400._dbl)
     ireleaseend (1) = ireleasestart(1)
     numlevel(1) = nb_level
     nsample(1)  = n_sample
@@ -717,8 +806,8 @@ contains
     n_sample=1
     long_min = xlon0
     long_max = xlon0 + (nx-2)*dx ! global assumed
-    press_l=0.
-    theta_l=0.
+    press_l=0._dp
+    theta_l=0._dp
     n_loc=0
     TTLactiv=.true.
     uniform_spread=.false.
@@ -748,7 +837,7 @@ contains
     nsample(1)=n_sample
    ! calculation of n_loc delayed to fixlayerpart
     jul1=juldate(launch_date,launch_time)
-    ireleasestart(1) = int((jul1-bdate)*86400.)
+    ireleasestart(1) = nint((jul1-bdate)*86400._dbl)
     ireleaseend (1) = ireleasestart(1)
     error=(check_input_date_2(jul1)==1).or.error
     mesh_size_lat=mesh_size
@@ -762,11 +851,11 @@ contains
     numpoint=1
     n_sample=1
     long_min = xlon0
-    long_max = xlon0 + (nx-2)*dx ! global assumed
-    lat_min = -90.
-    lat_max =  90.
-    press_l=0.
-    theta_l=0.
+    long_max = xlon0 + (nx-1)*dx ! global assumed
+    lat_min = -90._dp
+    lat_max =  90._dp
+    press_l=0._dp
+    theta_l=0._dp
     n_loc=0
     AccurateTemp=.true.
     uniform_spread=.true.
@@ -798,7 +887,7 @@ contains
     nsample(1)=n_sample
     ! calculation of n_loc delayed to fixlayerpart
     jul1=juldate(launch_date,launch_time)
-    ireleasestart(1) = int((jul1-bdate)*86400.)
+    ireleasestart(1) = nint((jul1-bdate)*86400._dbl)
     ireleaseend (1) = ireleasestart(1)
     error=(check_input_date_2(jul1)==1).or.error
     mesh_size_lat=mesh_size
@@ -807,36 +896,37 @@ contains
       select case (curtain_type)
       case (1)  
         allocate(lat_list(15))
-        lat_list = (/ -70.,-60.,-50.,-40.,-30.,-20.,-10.,0.,10.,20.,30.,40.,50.,60.,70. /)
-        lev1 = 39.
-        lev2 = 57.
-        inclev= 1.
-        uppertheta=2485.30
+        lat_list = (/ -70._dp,-60._dp,-50._dp,-40._dp,-30._dp,-20._dp, &
+         -10._dp,0._dp,10._dp,20._dp,30._dp,40._dp,50._dp,60._dp,70._dp/)
+        lev1 = 39._dp
+        lev2 = 57._dp
+        inclev= 1._dp
+        uppertheta=2485.30_dp
       case (2)
         print *,'readreleasesB2> WARNING: specific option will not work for all cases'
         make_layer=.false.
         allocate(lat_list(31))
         do i=1,31
-          lat_list(i)=2.*i-32.
+          lat_list(i)=2*i-32._dp
         enddo
-        lev1 = 31.
-        lev2 = 40.
-        inclev = 0.5
-        uppertheta=2485.30
+        lev1 = 31._dp
+        lev2 = 40._dp
+        inclev = 0.5_dp
+        uppertheta=2485.30_dp
         numpoint = 8
         xpoint1(1:8)=long_min
         xpoint2(1:8)=long_max
         nsample(1:8)=n_sample
         zpoint1(2:8)=zpoint1(1) ! just to avoid WARNING in fixlayerpart
         launch_time=120000
-        ireleasestart(1) = int((juldate(20001231,launch_time)-bdate)*86400.)
-        ireleasestart(2) = int((juldate(20001221,launch_time)-bdate)*86400.)
-        ireleasestart(3) = int((juldate(20001211,launch_time)-bdate)*86400.)
-        ireleasestart(4) = int((juldate(20001201,launch_time)-bdate)*86400.)
-        ireleasestart(5) = int((juldate(20000731,launch_time)-bdate)*86400.)
-        ireleasestart(6) = int((juldate(20000721,launch_time)-bdate)*86400.)
-        ireleasestart(7) = int((juldate(20000711,launch_time)-bdate)*86400.)
-        ireleasestart(8) = int((juldate(20000701,launch_time)-bdate)*86400.)
+        ireleasestart(1) = nint((juldate(20001231,launch_time)-bdate)*86400._dbl)
+        ireleasestart(2) = nint((juldate(20001221,launch_time)-bdate)*86400._dbl)
+        ireleasestart(3) = nint((juldate(20001211,launch_time)-bdate)*86400._dbl)
+        ireleasestart(4) = nint((juldate(20001201,launch_time)-bdate)*86400._dbl)
+        ireleasestart(5) = nint((juldate(20000731,launch_time)-bdate)*86400._dbl)
+        ireleasestart(6) = nint((juldate(20000721,launch_time)-bdate)*86400._dbl)
+        ireleasestart(7) = nint((juldate(20000711,launch_time)-bdate)*86400._dbl)
+        ireleasestart(8) = nint((juldate(20000701,launch_time)-bdate)*86400._dbl)
       end select        
     endif 
     if(make_curtain) print *,'lev1 lev2 inclev ',lev1,lev2,inclev
@@ -890,32 +980,32 @@ contains
     print *,'readreleases> n_loc    ',n_loc
     print *,'readreleases> instant_release ',instant_release
     print *,'readreleases> interp_release  ',interp_release
- case('ER2lyapou')
-    activ_Lyapunov=.true.
-    height_scale = 5000.
-    sheet_slope = 250.
-    delta_hor = 2500.
-    tau_orthog = -43200
-    campaign='SOLVE'
-    ER2_dir='/user/legras/h4/NASA/SOLVE/er2'
-    n_sample=1
-    instant_release=.false.
-    interp_release =.true.
-    numpart=0
-    n_loc=0
-    read(unitreleases,ER2)
-    call check_sample()
-    nsample(1) = n_sample
-    numlevel(1) = n_loc           ! to perform correct output of n_loc
-    delta_ver = delta_hor / sheet_slope
-    print *,'readreleases> ER2lyapou'
-    print *,'readreleases> ',ER2_day
-    print *,'readreleases> ',start_ER2time,end_ER2time
-    print *,'readreleases> n_sample ',n_sample
-    print *,'readreleases> n_loc    ',n_loc
-    print *,'readreleases> instant_release ',instant_release
-    print *,'readreleases> interp_release  ',interp_release 
- 
+! case('ER2lyapou')
+!    activ_Lyapunov=.true.
+!    height_scale = 5000.
+!    sheet_slope = 250.
+!    delta_hor = 2500.
+!    tau_orthog = -43200
+!    campaign='SOLVE'
+!    ER2_dir='/user/legras/h4/NASA/SOLVE/er2'
+!    n_sample=1
+!    instant_release=.false.
+!    interp_release =.true.
+!    numpart=0
+!    n_loc=0
+!    read(unitreleases,ER2)
+!    call check_sample()
+!    nsample(1) = n_sample
+!    numlevel(1) = n_loc           ! to perform correct output of n_loc
+!    delta_ver = delta_hor / sheet_slope
+!    print *,'readreleases> ER2lyapou'
+!    print *,'readreleases> ',ER2_day
+!    print *,'readreleases> ',start_ER2time,end_ER2time
+!    print *,'readreleases> n_sample ',n_sample
+!    print *,'readreleases> n_loc    ',n_loc
+!    print *,'readreleases> instant_release ',instant_release
+!    print *,'readreleases> interp_release  ',interp_release 
+! 
  ! Releases particles at the top of clouds in the tropics
  case('CLAUS')
     CLAUS_dir='/data/atissier/flexpart_in/CLAUS_TBmax/'
@@ -925,7 +1015,7 @@ contains
     TB_max=230
     latmin_Claus=-20
     latmax_Claus=40
-    thetacut=380.
+    thetacut=380._dp
     delayed_initialization=.true.
     AccurateTemp=.true.
 
@@ -1001,7 +1091,7 @@ end subroutine readreleasesB2
 
       function check_input_date_2 (jul1)
       integer :: check_input_date_2
-      double precision, intent(in) :: jul1
+      real (dbl), intent(in) :: jul1
       check_input_date_2 = 0
       if (ldirect.eq.1) then
         if ((jul1.lt.bdate).or.(jul1.gt.edate)) then
@@ -1082,7 +1172,7 @@ end subroutine readreleasesB2
             ytra1(numpart)=ypoint1(i)
             ztra1(numpart)=-(log(zpoint1(i)/p0)+j1*zhelp)
 !           print *,numpart,xtra1(numpart),ytra1(numpart),ztra1(numpart)
-            itra1(numpart)=ireleasestart(i)+int((0.5+float(j1-1))*thelp)
+            itra1(numpart)=ireleasestart(i)+int((0.5_dp+float(j1-1))*thelp)
             ih=mod(itra1(numpart),abs(lsynctime)) ! only intervals of lsynctime
             itra1(numpart)=itra1(numpart)-ih    ! seconds are allowed
             itramem(numpart)=itra1(numpart)
@@ -1180,7 +1270,7 @@ end subroutine readreleasesB2
                jyps=jy
 !              Avoid calling psurf beyond the pole
                if(jy==ny-1)jyps=jy-1
-               ylat = (ylat0 + yc*dy)*pi/180.
+               ylat = (ylat0 + yc*dy)*pi/180._dp
 !              print *, 'fixlayerpartM > ylat ',ylat
                xc = xpoint1(i)
                count_lon=0
@@ -1195,12 +1285,12 @@ end subroutine readreleasesB2
                else
                  corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
                endif
-               do while (xc <= xpoint2(i)+epsil)
+               do while (xc < xpoint2(i)+epsil)
                  n_loc=n_loc+1
                  ix=floor(xc)
                  count_lon=count_lon+1
 !                Avoid to call non existent ps(.,jy+1,.,.) when at the NP
-                 ddx=modulo(xc-float(ix),1.) ;  ddy=yc-float(jyps)
+                 ddx=modulo(xc-float(ix),1._dp) ;  ddy=yc-float(jyps)
                  rddx=1.-ddx      ;  rddy=1.-ddy
                  p1=rddx*rddy     ;  p2=ddx*rddy
                  p3=rddx*ddy      ;  p4=ddx*ddy
@@ -1275,7 +1365,7 @@ end subroutine readreleasesB2
 
           if (make_curtain) then
              do jl=1,size(lat_list)
-               ylat = lat_list(jl)*pi/180.   
+               ylat = lat_list(jl)*pi/180._dp  
                yc = (lat_list(jl)-ylat0)/dy
                jy = floor(yc)
                if (uniform_mesh) then
@@ -1409,7 +1499,7 @@ end subroutine readreleasesB2
 
       error = .false.
       epsil =  1.e-4 ; epsil2 = 1.e-7
-      thetamin=10000. ; thetamax=0.
+      thetamin=10000._dp ; thetamax=0._dp
 
       if(iso_mass) then
         print *,'fixpresslayerpart does not allow to set pressure'
@@ -1450,7 +1540,7 @@ end subroutine readreleasesB2
           if(make_uni3D) then
             yc = ypoint1(i)
             do while (yc <= ypoint2(i)+epsil)
-               ylat = (ylat0 + yc*dy)*pi/180.
+               ylat = (ylat0 + yc*dy)*pi/180._dp
                jy = floor(yc)
 !              avoid calling psurf beyond North pole
                jyps=jy
@@ -1520,7 +1610,7 @@ end subroutine readreleasesB2
             print *,'fixpresslayerpart > coef_interp, ',coef_interp
             yc = ypoint1(i)
             do while (yc <= ypoint2(i)+epsil)
-               ylat = (ylat0 + yc*dx)*pi/180.
+               ylat = (ylat0 + yc*dx)*pi/180._dp
                xc = xpoint1(i)
                count_lon=0
                if (uniform_mesh) then
@@ -1745,10 +1835,10 @@ end subroutine readreleasesB2
         print *,'fixmultilayer > zc     ',zc
         print *,'fixmultilayer > xpoint ',xpoint1(i),xpoint2(i)
         print *,'fixmultilayer > ypoint ',ypoint1(i),ypoint2(i)
-        if ((xpoint1(i) < 0.).or.(xpoint1(i) > nx+epsil2)) go to 999
-        if ((xpoint2(i) < 0.).or.(xpoint2(i) > nx+epsil2)) go to 999
-        if ((ypoint1(i) < 0.).or.(ypoint1(i) > ny+epsil2)) go to 999
-        if ((ypoint2(i) < 0.).or.(ypoint2(i) > ny+epsil2)) go to 999
+        if ((xpoint1(i) < 0.).or.(xpoint1(i) > nx-1+epsil2)) go to 999
+        if ((xpoint2(i) < 0.).or.(xpoint2(i) > nx-1+epsil2)) go to 999
+        if ((ypoint1(i) < 0.).or.(ypoint1(i) > ny-1+epsil2)) go to 999
+        if ((ypoint2(i) < 0.).or.(ypoint2(i) > ny-1+epsil2)) go to 999
 !       define start and end times to be on a time-step boundary       
         it_start = ireleasestart(i) - mod(ireleasestart(i),abs(lsynctime))
         it_end   = ireleaseend(i)   - mod(ireleaseend(i),  abs(lsynctime))
@@ -1760,14 +1850,14 @@ end subroutine readreleasesB2
           yc = ypoint1(i)
           dolat: do while (yc <= ypoint2(i)+epsil)
             jy=floor(yc)
-            ylat = (ylat0 + yc*dy)*pi/180.
+            ylat = (ylat0 + yc*dy)*pi/180._dp
 !           defined corrected mesh if needed           
             if (uniform_mesh.and.uniform_spread) then
-              nb_points_latcircle = int(nx*abs(cos(ylat))/mesh_size_long)
+              nb_points_latcircle = int((nx-1)*abs(cos(ylat))/mesh_size_long)
               if(nb_points_latcircle>0) then
-                corrected_mesh_size = float(nx)/nb_points_latcircle
+                corrected_mesh_size = float(nx-1)/nb_points_latcircle
               else 
-                corrected_mesh_size = 2*float(nx) ! set a large value to get only 1 pt on circle
+                corrected_mesh_size = 2*float(nx-1) ! set a large value to get only 1 pt on circle
               endif
             else if (uniform_spread) then
               corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
@@ -1807,13 +1897,13 @@ end subroutine readreleasesB2
         yc = ypoint1(i)
         dolat2: do while (yc <= ypoint2(i)+epsil)
           jy=floor(yc)
-          ylat = (ylat0 + yc*dy)*pi/180.
+          ylat = (ylat0 + yc*dy)*pi/180._dp
           if (uniform_mesh.and.uniform_spread) then
-             nb_points_latcircle = int(nx*abs(cos(ylat))/mesh_size_long)
+             nb_points_latcircle = int((nx-1)*abs(cos(ylat))/mesh_size_long)
              if(nb_points_latcircle>0) then
-               corrected_mesh_size = float(nx)/nb_points_latcircle
+               corrected_mesh_size = float(nx-1)/nb_points_latcircle
              else 
-               corrected_mesh_size = 2*float(nx) ! set a large value to get only 1 pt on circle
+               corrected_mesh_size = 2*float(nx-1) ! set a large value to get only 1 pt on circle
              endif
           else if (uniform_spread) then
               corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
@@ -1875,6 +1965,207 @@ end subroutine readreleasesB2
       end subroutine fixmultilayer
       
 !===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@ FIXMULTILAYER_TROPOMASK @@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+
+ subroutine fixmultilayer_tropomask(error)
+!*******************************************************************************b
+!                                                                              *
+!     This routine fixes the release times and release locations of all        *
+!     particles a fixed number of potential temperature layers.                *
+!                                                                              *
+!     Author: B. Legras
+!     25 October 2014
+!     from the previous version of fixmultilayer                                                                         *
+!    
+!                                                                              *
+!*******************************************************************************
+!                                                                              *
+! Variables:                                                                   *
+!                                                                              *
+!*******************************************************************************
+
+ real (dp) :: xc,yc,zc, epsil,epsil2, ylat, xlm
+ real (dp) :: corrected_mesh_size, ddx, ddy
+ real (dbl) :: datef
+ real (dp), allocatable :: tropoz(:,:,:),buff(:)
+ integer :: k,ix,jy,it,tt,yy,mm,dd,ll,dyr
+ integer :: year_length,ldayscum(12)
+ character (len=4) :: yyyy
+ character (len=256) :: tropofile
+ integer nb_points_latcircle
+ logical error
+ 
+ ldayscum=(/0,31,59,90,120,151,181,212,243,273,304,334/)
+
+ error = .false.
+ epsil =  1.e-3 ; epsil2=1.e-7
+
+ allocate (itra0(maxpart))
+      
+ numpart=0 
+ print *,'numpoint ',numpoint
+ print *,'path',path(2)
+ mesh_size_lat  = mesh_size_lat/dy
+ mesh_size_long = mesh_size_long/dx
+ print *,'fixmultilayer_tm > meshs ',mesh_size_long,mesh_size_lat
+ print *,'fixmultilayer_tm > xlon0,ylat0,dx,dy ',xlon0,ylat0,dx,dy
+ print *,'fixmultilayer_tm > year_b year_e ',year_b,year_e
+! loops on the years, months and days
+! note that time note used
+ tt=0
+ allocate(buff(ny*nx))
+ ! calculate the size of packet_size
+ ll=0
+ do yy=year_b,year_e
+   if(mod(yy,4)==0) then
+     ll=366+ll
+   else
+     ll=365+ll
+   endif
+ enddo
+ allocate (packet_len(ll))
+ 
+! Shift of xpoint and ypoint 
+ do k=1,numpoint
+   xpoint1(k) = (xpoint1(k)-xlon0)/dx
+   xpoint2(k) = (xpoint2(k)-xlon0)/dx
+   ypoint1(k) = (ypoint1(k)-ylat0)/dy
+   ypoint2(k) = (ypoint2(k)-ylat0)/dy
+   if ((xpoint1(k) < 0.).or.(xpoint1(k) > nx-1+epsil2)) go to 999
+   if ((xpoint2(k) < 0.).or.(xpoint2(k) > nx-1+epsil2)) go to 999
+   if ((ypoint1(k) < 0.).or.(ypoint1(k) > ny+epsil2)) go to 999
+   if ((ypoint2(k) < 0.).or.(ypoint2(k) > ny+epsil2)) go to 999
+ enddo
+ 
+ doyy: do yy=year_b,year_e  
+!  load the tropopause height in theta
+   write(yyyy,'(I4)')yy
+   tropofile=trim(tropodir)//'/tropo-theta-EI-'//yyyy//'.bin'
+   open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
+   if(mod(yy,4)==0) then
+     year_length=366
+   else
+     year_length=365
+   endif
+   allocate (tropoz(0:nx-1,0:ny-1,year_length))
+   do dyr=1,year_length
+     read(tropunit,rec=dyr) buff
+     tropoz(:,:,dyr)=reshape(buff,(/nx,ny/))
+   enddo
+   print *,'tropopause loaded ',yy
+   domm: do mm=1,12
+!    days 10 and 20 of each month are used
+     dodd: do dd=10,20,10
+       tt=tt+1
+       datef=juldate(10000*yy+100*mm+dd,120000)
+       it=nint((datef-bdate)*86400._dp)
+!      define time to be on a time-step boundary
+       it=it-mod(it,abs(lsynctime)) 
+       dyr=dd+ldayscum(mm)
+       if (mod(yy,4)==0 .and. mm>2) dyr=dyr+1
+!      loop on the number of layers
+       packet_len(tt)=0
+       
+       dolayer: do k=1,numpoint
+         zc=zpoint1(k)
+         if (xglobal) then
+          xlm=xpoint2(k)
+         else
+           xlm=xpoint2(2)+epsil
+         endif
+
+         yc = ypoint1(k)
+         dolat: do while (yc < ypoint2(k)+epsil)
+           jy=floor(yc)
+           ddy=yc-jy
+           ylat = (ylat0 + yc*dy)*pi/180._dp
+!          defined corrected longitude mesh if needed           
+           if (uniform_mesh.and.uniform_spread) then
+             nb_points_latcircle = int(nx*abs(cos(ylat))/mesh_size_long)
+             if(nb_points_latcircle>0) then
+               corrected_mesh_size = float(nx-1)/nb_points_latcircle
+             else 
+               corrected_mesh_size = 2*float(nx-1) ! set a large value to get only 1 pt on circle
+             endif
+           else if (uniform_spread) then
+             corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
+           else
+             corrected_mesh_size = mesh_size_long
+           endif
+!          loop in longitude
+           xc = xpoint1(k)
+           dolong: do while (xc < xlm)
+             ix=floor(xc)
+             ddx=xc-ix
+             ! test the tropopause
+             ! it is assumed that the tropopause has same grid as the wind
+             if (zc < 380) then
+               if (zc < tropoz(ix,jy,dyr)*(1-ddx)*(1-ddy) &
+                       +tropoz(ix+1,jy,dyr)*(1-ddx)*ddy &
+                       +tropoz(ix,jy+1,dyr)*ddx*(1-ddy) &
+                       +tropoz(ix+1,jy+1,dyr)*ddx*ddy) then
+                 xc = xc + corrected_mesh_size
+                 cycle dolong
+               endif     
+             endif
+             numpart=numpart+1
+             packet_len(tt)=packet_len(tt)+1
+             if(numpart > maxpart) go to 996
+             xtra1(numpart) = xc
+             ytra1(numpart) = yc
+             ztra1(numpart) = zc
+             itra1(numpart) = it
+             itra0(numpart) = it
+             xc = xc + corrected_mesh_size
+           enddo dolong
+           yc = yc + mesh_size_lat
+         enddo dolat
+       enddo dolayer
+       write(*,'("tt it yyyymmdd packet_len",I5,I12,3X,I4,2I2.2, I10)') &
+             tt,it,yy,mm,dd,packet_len(tt)
+     enddo dodd
+   enddo domm
+   deallocate(tropoz)
+   close(tropunit)
+ enddo doyy
+ deallocate(buff)
+
+ print *,'fixmultilayer_tm > completed, layers, numpart ',numpoint, numpart
+ return
+
+996   error=.true.
+      print *,'numpart ',numpart
+      print *,'xc yc ',xc,yc
+      write(*,*) '#####################################################'
+      write(*,*) '#### SUBROUTINE FIXMULTILAYER_TROPOMASK          ####'
+      write(*,*) '####                                             ####'
+      write(*,*) '#### ERROR - TOTAL NUMBER OF PARTICLES SPECIFIED ####'
+      write(*,*) '#### IN FILE "RELEASES" OR CARRIED FORWARD FROM  ####'
+      write(*,*) '#### PREVIOUS RUN EXCEEDS THE MAXIMUM ALLOWED    ####'
+      write(*,*) '#### NUMBER. REDUCE EITHER NUMBER OF PARTICLES   ####'
+      write(*,*) '#### PER RELEASE POINT OR REDUCE NUMBE OF        ####'
+      write(*,*) '#### RELEASE POINTS.                             ####'
+      write(*,*) '#####################################################'
+      return
+
+999   error=.true.
+      write(*,*) '#####################################################'
+      write(*,*) '###  ERROR IN THE XPOINT YPOINT INITIALIZATION    ###'
+      write(*,*) '#####################################################'
+      print *,k,xpoint1(k),xpoint2(k),ypoint1(k),ypoint2(k)
+      return
+
+995   error=.true.
+      write(*,*) '#####################################################'
+      write(*,*) '###  ERROR THE LAUNCH INTERVAL IS NOT A DIVIDER   ###'
+      write(*,*) '###  OF THE START - END PERIOD                    ###'
+      write(*,*) '#####################################################'
+      return
+
+      end subroutine fixmultilayer_tropomask
+      
+!===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SETPOS0FROMEXT @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 !=====|==1=========2=========3=========4=========5=========6=========7=========8
 
@@ -1895,8 +2186,6 @@ end subroutine readreleasesB2
 !*******************************************************************************
   use ecmwf_diab
  
-! Host directory of the external files
-  character(len=256) :: datasource
 ! Files
   character(len=256) :: sizes_file,itra_file,ztra_file,xytra_file
 ! Experiment type
@@ -1910,9 +2199,7 @@ end subroutine readreleasesB2
 ! do index
   integer :: i
   
-! Hardwire definition to be transferred to input parameters  
-  datasource='/data/legras/tmp-flexout/AGEF-bis/'
-  
+
 ! Determination of exp type from COMMAND parameters
   if (diabatic_w) then
     exp_type='DIA'
@@ -1921,70 +2208,83 @@ end subroutine readreleasesB2
   else
     exp_type=''
   endif
-  
-! File names
-  sizes_file=trim(datasource)//'extern_pos0_'//trim(exp_type)//'_sizes.dat'
-  itra_file =trim(datasource)//'extern_pos0_'//trim(exp_type)//'_itra.dat'
-  ztra_file =trim(datasource)//'extern_pos0_'//trim(exp_type)//'_ztra.dat'
-  xytra_file=trim(datasource)//'extern_pos0_'//trim(exp_type)//'_xytra.dat'
-  
-! Read what is needed from the size file
-  open(701,FILE=sizes_file,STATUS='OLD',ACCESS='DIRECT',RECL=4)
-  read(701,REC=1) packet_size
-  read(701,REC=2) count_t
-  close(701)
- 
-! Check the dimension against maxpart
-  if (packet_size*count_t > maxpart) then
-     print *,'[ACHTUNG ALARM] setpos0from ext'
-     print *,'packet_size,count_t,maxpart ',packet_size,count_t,maxpart
-     stop 750
-  endif
-  
-! Read the itra file
-  allocate (itra_l(count_t))
-  open(702,FILE=itra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*count_t)
-  read(702,REC=1) itra_l
-  close(702)
-  
-! Read the xytra file
-  allocate (xtra_l(packet_size),ytra_l(packet_size))
-  open(703,FILE=xytra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*packet_size)
-  read(703,REC=1) xtra_l
-  read(703,REC=2) ytra_l
-  close(703)
-  
-! Read the ztra file
-  allocate (ztra_l(packet_size,count_t))
-  open(704,FILE=ztra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*packet_size)
-  do i=1,count_t
-    read(704,REC=i) ztra_l(:,i)
-  enddo
-  close(704)
-  
-! Print a few lines
-  print *,'setpos0fromext > packet_size, count_t ',packet_size,count_t
-  print *,'setpos0fromext > ',maxpart,packet_size*count_t
-  print *,'setpos0fromext > min, max x ',minval(xtra_l),maxval(ytra_l)
-  print *,'setpos0fromext > min, max z ',minval(ztra_l),maxval(ztra_l)
-  
-! Proceed with the initialization
 
-! Allocate itra0
-  allocate(itra0(maxpart))
+! process differently according the the type of initialization
+  select case (external_type)
   
-! Copy files
-  numpart=0
-  do i=1,count_t
-    xtra1(numpart+1:numpart+packet_size)=xtra_l
-    ytra1(numpart+1:numpart+packet_size)=ytra_l
-    ztra1(numpart+1:numpart+packet_size)=ztra_l(:,i)
-    itra0(numpart+1:numpart+packet_size)=itra_l(i)
-    itra1(numpart+1:numpart+packet_size)=itra_l(i)
-    numpart=numpart+packet_size 
-  enddo
-  print *,'setpos0fromext > numpart ',numpart
-  flush 6
+! First case: initialisation of the tropause on a fixed rectangular grid
+  case ('TROPOPAUSE')
+  
+!   File names
+    sizes_file=trim(external_directory)//'extern_pos0_'//trim(exp_type)//'_sizes.dat'
+    itra_file =trim(external_directory)//'extern_pos0_'//trim(exp_type)//'_itra.dat'
+    ztra_file =trim(external_directory)//'extern_pos0_'//trim(exp_type)//'_ztra.dat'
+    xytra_file=trim(external_directory)//'extern_pos0_'//trim(exp_type)//'_xytra.dat'
+  
+!   Read what is needed from the size file
+    open(701,FILE=sizes_file,STATUS='OLD',ACCESS='DIRECT',RECL=4)
+    read(701,REC=1) packet_size
+    read(701,REC=2) count_t
+    close(701)
+ 
+!   Check the dimension against maxpart
+    if (packet_size*count_t > maxpart) then
+       print *,'[ACHTUNG ALARM] setpos0from ext'
+       print *,'packet_size,count_t,maxpart ',packet_size,count_t,maxpart
+       stop 750
+    endif
+  
+!   Read the itra file
+    allocate (itra_l(count_t))
+    open(702,FILE=itra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*count_t)
+    read(702,REC=1) itra_l
+    close(702)
+  
+!   Read the xytra file
+    allocate (xtra_l(packet_size),ytra_l(packet_size))
+    open(703,FILE=xytra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*packet_size)
+    read(703,REC=1) xtra_l
+    read(703,REC=2) ytra_l
+    close(703)
+  
+!   Read the ztra file
+    allocate (ztra_l(packet_size,count_t))
+    open(704,FILE=ztra_file,STATUS='OLD',ACCESS='DIRECT',RECL=4*packet_size)
+    do i=1,count_t
+       read(704,REC=i) ztra_l(:,i)
+    enddo
+    close(704)
+  
+!   Print a few lines
+    print *,'setpos0fromext > packet_size, count_t ',packet_size,count_t
+    print *,'setpos0fromext > ',maxpart,packet_size*count_t
+    print *,'setpos0fromext > min, max x ',minval(xtra_l),maxval(ytra_l)
+    print *,'setpos0fromext > min, max z ',minval(ztra_l),maxval(ztra_l)
+  
+!   Proceed with the initialization
+
+!   Allocate itra0
+    allocate(itra0(maxpart))
+  
+!   Copy files
+    numpart=0
+    do i=1,count_t
+      xtra1(numpart+1:numpart+packet_size)=xtra_l
+      ytra1(numpart+1:numpart+packet_size)=ytra_l
+      ztra1(numpart+1:numpart+packet_size)=ztra_l(:,i)
+      itra0(numpart+1:numpart+packet_size)=itra_l(i)
+      itra1(numpart+1:numpart+packet_size)=itra_l(i)
+      numpart=numpart+packet_size 
+    enddo
+    print *,'setpos0fromext > numpart ',numpart
+    flush 6
+    deallocate (itra_l,xtra_l,ytra_l,ztra_l)
+    
+  case default
+    print *,'This case of external input is not valid ',external_type
+    stop
+  
+  end select
   
 ! Diagnostic output
 ! release_table_5 not done
@@ -1997,7 +2297,7 @@ end subroutine readreleasesB2
   
   print *,'setpos0fromext completed'
 
-  deallocate (itra_l,xtra_l,ytra_l,ztra_l)
+  
   
   end subroutine setpos0fromext
 
@@ -2024,7 +2324,7 @@ end subroutine readreleasesB2
 !                                                                              *
 !*******************************************************************************
 
- use lyapunov, only: numpart_np, activ_Lyapunov
+! use lyapunov, only: numpart_np, activ_Lyapunov
        
  real, allocatable, dimension(:) :: timeO3, UTGPS, GMTMM,  &
       off_jul,interp_time, &
@@ -2067,7 +2367,7 @@ end subroutine readreleasesB2
  enddo 
  FDate=10000*YYYY + 100*MM + DD
  diff_time = end_ER2time - start_ER2time
- nobs=int(1.05*diff_time)
+ nobs=int(1.05_dp*diff_time)
  allocate (timeO3(nobs),O3(nobs),UTGPS(nobs),GMTMM(nobs))
  allocate (DaltGPS(nobs),DlatGPS(nobs),DlongGPS(nobs))
  allocate (QGPS(nobs),TedrGPS(nobs),ReynGPS(nobs))
@@ -2078,14 +2378,14 @@ end subroutine readreleasesB2
  do while(.not. stop_loop)
    read(unitER2_o3,*,err=997,end=120) timeO3(j), O3(j)
    if(.not.do_rel) then
-     if((timeO3(j)>(start_ER2time-0.9999)) &
+     if((timeO3(j)>(start_ER2time-0.9999_dp)) &
      .and.(timeO3(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((timeO3(j)<(end_ER2time+0.9999)) &
+     if((timeO3(j)<(end_ER2time+0.9999_dp)) &
      .and.(timeO3(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2101,14 +2401,14 @@ end subroutine readreleasesB2
      DaltGPS(j), DlatGPS(j), DLongGPS(j), QGPS(j), &
      TedrGPS(j), ReynGPS(j)
    if(.not.do_rel) then
-     if((UTGPS(j)>(start_ER2time-0.9999)) &
+     if((UTGPS(j)>(start_ER2time-0.9999_dp)) &
      .and.(UTGPS(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((UTGPS(j)<(end_ER2time+0.9999)) &
+     if((UTGPS(j)<(end_ER2time+0.9999_dp)) &
      .and.(UTGPS(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2123,14 +2423,14 @@ end subroutine readreleasesB2
    read(unitER2_MM,*,err=997,end=120) GMTMM(j), &
      PStaMM(j), TstaMM(j), ThtaMM(j), UMM(j), VMM(j), WMM(j)
    if(.not.do_rel) then
-     if((GMTMM(j)>(start_ER2time-0.9999)) &
+     if((GMTMM(j)>(start_ER2time-0.9999_dp)) &
      .and.(GMTMM(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((GMTMM(j)<(end_ER2time+0.9999)) &
+     if((GMTMM(j)<(end_ER2time+0.9999_dp)) &
      .and.(GMTMM(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2151,12 +2451,12 @@ end subroutine readreleasesB2
    F_long(j) = real(DlongGPS(j))*1.e-5
  enddo
  
- if( activ_Lyapunov ) then
-   numpart_np = n_loc
-   numpart = numpart_np * 7
- else
+! if( activ_Lyapunov ) then
+!   numpart_np = n_loc
+!   numpart = numpart_np * 7
+! else
    numpart = n_loc * n_sample
- endif
+! endif
  error = (check_numpart() == 1).or.error
  
 !  Interpolation
@@ -2174,10 +2474,10 @@ end subroutine readreleasesB2
  call uvip3p(3,nMMobs, GMTMM,F_z   ,n_loc,interp_time,interp_ztra1)
  j1=1   
  do i=1,n_loc
-   itra1(j1) = int((juldate(FDate,000000)-bdate)*86400. + interp_time(i))
+   itra1(j1) = nint((juldate(FDate,000000)-bdate)*86400._dbl + interp_time(i))
    error = (check_launch_time(i,j1) == 1).or.error
    do j=j1,j1+n_sample-1
-     itra1(j) = int((juldate(FDate,000000)-bdate)*86400. + interp_time(i))
+     itra1(j) = nint((juldate(FDate,000000)-bdate)*86400._dbl + interp_time(i))
      xtra1(j) = (interp_xtra1(i) - xlon0)/dx
      ytra1(j) = (interp_ytra1(i) - ylat0)/dy
      ztra1(j) = interp_ztra1(i)
@@ -2257,7 +2557,7 @@ end subroutine readreleasesB2
 !                                                                              *
 !*******************************************************************************
 
- use lyapunov, only: numpart_np, activ_Lyapunov
+! use lyapunov, only: numpart_np, activ_Lyapunov
  use isentrop_m, only: isentropic_motion
  use ecmwf_diab
        
@@ -2304,7 +2604,7 @@ end subroutine readreleasesB2
  enddo 
  FDate=10000*YYYY + 100*MM + DD
  diff_time = end_ER2time - start_ER2time
- nobs=int(1.05*diff_time) ! rough estimate for less than 1Hz signal
+ nobs=int(1.05_dp*diff_time) ! rough estimate for less than 1Hz signal
  allocate (timeO3(nobs),O3(nobs),UTGPS(nobs),GMTMM(nobs))
  allocate (DaltGPS(nobs),DlatGPS(nobs),DlongGPS(nobs))
  allocate (QGPS(nobs),TedrGPS(nobs),ReynGPS(nobs))
@@ -2315,14 +2615,14 @@ end subroutine readreleasesB2
  do while(.not. stop_loop)
    read(unitER2_o3,*,err=997,end=120) timeO3(j), O3(j)
    if(.not.do_rel) then
-     if((timeO3(j)>(start_ER2time-0.9999)) &
+     if((timeO3(j)>(start_ER2time-0.9999_dp)) &
      .and.(timeO3(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((timeO3(j)<(end_ER2time+0.9999)) &
+     if((timeO3(j)<(end_ER2time+0.9999_dp)) &
      .and.(timeO3(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2338,14 +2638,14 @@ end subroutine readreleasesB2
      DaltGPS(j), DlatGPS(j), DLongGPS(j), QGPS(j), &
      TedrGPS(j), ReynGPS(j)
    if(.not.do_rel) then
-     if((UTGPS(j)>(start_ER2time-0.9999)) &
+     if((UTGPS(j)>(start_ER2time-0.9999_dp)) &
      .and.(UTGPS(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((UTGPS(j)<(end_ER2time+0.9999)) &
+     if((UTGPS(j)<(end_ER2time+0.9999_dp)) &
      .and.(UTGPS(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2360,7 +2660,7 @@ end subroutine readreleasesB2
    read(unitER2_MM,*,err=997,end=120) GMTMM(j), &
      PStaMM(j), TstaMM(j), ThtaMM(j), UMM(j), VMM(j), WMM(j)
    if(.not.do_rel) then
-     if((GMTMM(j)>(start_ER2time-0.9999)) &
+     if((GMTMM(j)>(start_ER2time-0.9999_dp)) &
      .and.(GMTMM(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
@@ -2382,16 +2682,16 @@ end subroutine readreleasesB2
  if(z_motion) & 
    F_z(1:nMMobs) = -log(10.*real(PStaMM(1:nMMobs))/p0) ! p0 in Pascal
  if(diabatic_w.or.isentropic_motion) &
-   F_z(1:nMMobs) = ThtaMM(1:nMMobs) * 0.1
+   F_z(1:nMMobs) = ThtaMM(1:nMMobs) * 0.1_dp
  F_lat(1:nGPSobs)  = real(DlatGPS(1:nGPSobs)) *1.e-5
  F_long(1:nGPSobs) = real(DlongGPS(1:nGPSobs)) *1.e-5
  
- if( activ_Lyapunov ) then
-   numpart_np = n_loc
-   numpart = numpart_np * 7
- else
+! if( activ_Lyapunov ) then
+!   numpart_np = n_loc
+!   numpart = numpart_np * 7
+! else
    numpart = n_loc * n_sample
- endif
+! endif
  error = (check_numpart() == 1).or.error
  
 !  Interpolation
@@ -2409,10 +2709,10 @@ end subroutine readreleasesB2
  call uvip3p(3,nMMobs, GMTMM,F_z   ,n_loc,interp_time,interp_ztra1)
  j1=1   
  do i=1,n_loc
-   itra1(j1) = int((juldate(FDate,000000)-bdate)*86400. + interp_time(i))
+   itra1(j1) = nint((juldate(FDate,000000)-bdate)*86400._dbl + interp_time(i))
    error = (check_launch_time(i,j1) == 1).or.error
    do j=j1,j1+n_sample-1
-     itra1(j) = int((juldate(FDate,000000)-bdate)*86400. + interp_time(i))
+     itra1(j) = nint((juldate(FDate,000000)-bdate)*86400._dbl + interp_time(i))
      xtra1(j) = (interp_xtra1(i) - xlon0)/dx
      ytra1(j) = (interp_ytra1(i) - ylat0)/dy
      ztra1(j) = interp_ztra1(i)
@@ -2505,7 +2805,7 @@ end subroutine readreleasesB2
 !                                                                              *
 !*******************************************************************************
 
- use lyapunov, only: numpart_np, activ_Lyapunov 
+! use lyapunov, only: numpart_np, activ_Lyapunov 
  
  real, allocatable, dimension(:) :: UTFP, GMTMM,  &
       interp_time, &
@@ -2543,7 +2843,7 @@ end subroutine readreleasesB2
  enddo
  FDate=10000*YYYY + 100*MM + DD
  diff_time = end_ER2time - start_ER2time
- nobs=int(1.05*diff_time)
+ nobs=int(1.05_dp*diff_time)
  allocate (UTFP(nobs),GMTMM(nobs))
  allocate (PaltFP(nobs),DlatGPS(nobs),DlongGPS(nobs),TASFP(nobs))
  allocate (PStaMM(nobs),TstaMM(nobs),ThtaMM(nobs),UMM(nobs))
@@ -2554,14 +2854,14 @@ end subroutine readreleasesB2
    read(unitER2_FP,*,err=997,end=120) UTFP(j), &
      PaltFP(j), DlatGPS(j), DLongGPS(j), TASFP(j)
    if(.not.do_rel) then
-     if((UTFP(j)>(start_ER2time-4.9999)) &
+     if((UTFP(j)>(start_ER2time-4.9999_dp)) &
      .and.(UTFP(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((UTFP(j)<(end_ER2time+4.9999)) &
+     if((UTFP(j)<(end_ER2time+4.9999_dp)) &
      .and.(UTFP(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2576,14 +2876,14 @@ end subroutine readreleasesB2
    read(unitER2_MM,*,err=997,end=120) GMTMM(j), &
      PStaMM(j), TstaMM(j), ThtaMM(j), UMM(j), VMM(j), WMM(j)
    if(.not.do_rel) then
-     if((GMTMM(j)>(start_ER2time-0.9999)) &
+     if((GMTMM(j)>(start_ER2time-0.9999_dp)) &
      .and.(GMTMM(j).le.start_ER2time)) then
         do_rel=.true. ; j=j+1
      else
         cycle
      endif
    else   
-     if((GMTMM(j)<(end_ER2time+0.9999)) &
+     if((GMTMM(j)<(end_ER2time+0.9999_dp)) &
      .and.(GMTMM(j).ge.end_ER2time)) then
         stop_loop=.true.
      else
@@ -2604,12 +2904,12 @@ end subroutine readreleasesB2
    F_long(j) = real(DlongGPS(j))*1.e-3
  enddo
  
- if( activ_Lyapunov ) then
-   numpart_np = n_loc
-   numpart = numpart_np * 7
- else
+! if( activ_Lyapunov ) then
+!   numpart_np = n_loc
+!   numpart = numpart_np * 7
+! else
    numpart = n_loc * n_sample
- endif
+! endif
  error = (check_numpart() == 1).or.error
  
 !  Interpolation
@@ -2627,7 +2927,7 @@ end subroutine readreleasesB2
  call uvip3p(3,nMMobs, GMTMM,F_z   ,n_loc,interp_time,interp_ztra1)
  j1=1   
  do i=1,n_loc
-   itra1(j1) = int((juldate(FDate,000000)-bdate)*86400. + interp_time(i))
+   itra1(j1) = nint((juldate(FDate,000000)-bdate)*86400._dbl + interp_time(i))
    error = (check_launch_time(i,j1) == 1).or.error
    do j=j1,j1+n_sample-1
      itra1(j) = itra1(j1)
@@ -2717,7 +3017,7 @@ end subroutine readreleasesB2
  integer hh,mm,ss,hh_start,mm_start,ss_start,hh_end,mm_end,ss_end
  integer i,j,j1,rank_obs,nobs
  real diff_time
- double precision, allocatable :: julian_date(:)
+ real (dbl), allocatable :: julian_date(:)
  
  error=.false.
  open(unitmozaic,file=trim(MOZAIC_dir)//trim(MOZAIC_filename), &
@@ -2746,7 +3046,7 @@ end subroutine readreleasesB2
    endif
    diff_time=diff_time+(mm_end - mm_start)*60 + &
                         ss_end - ss_start
-   nobs=int(diff_time/4 * 1.05)
+   nobs=int(diff_time/4 * 1.05_dp)
    allocate (F_lat(nobs),F_long(nobs),F_baroalt(nobs),F_radioalt(nobs))
    allocate (F_press(nobs),A340_statictemp(nobs),A340_airspeed(nobs))
    allocate (F_groundspeed(nobs),F_zonalwind(nobs),F_meridionalwind(nobs))
@@ -2824,11 +3124,11 @@ end subroutine readreleasesB2
  call uvip3p(3,nobs,off_jul,F_z   ,n_loc,interp_time,interp_ztra1)
  j1=1
  do i=1,n_loc
-   itra1(j1) = int((julian_date(1)-bdate & 
+   itra1(j1) = nint((julian_date(1)-bdate & 
             +(i-1)*(julian_date(nobs)-julian_date(1))/(n_loc-1))*86400)
    error = (check_launch_time(i,j1) == 1).or.error
    do j=j1,j1+n_sample-1
-     itra1(j) = int((julian_date(1)-bdate & 
+     itra1(j) = nint((julian_date(1)-bdate & 
             +(i-1)*(julian_date(nobs)-julian_date(1))/(n_loc-1))*86400)
      xtra1(j) = (interp_xtra1(i) - xlon0)/dx
      ytra1(j) = (interp_ytra1(i) - ylat0)/dy
@@ -2942,7 +3242,7 @@ end subroutine readreleasesB2
  integer hh,mm,ss,hh_start,mm_start,ss_start,hh_end,mm_end,ss_end
  integer i,rank_obs,itra_part
  real x_part,y_part
- double precision julian_date
+ real (dbl) :: julian_date
  
  error=.false.
  open(unitmozaic,file=trim(MOZAIC_dir)//trim(MOZAIC_filename), &
@@ -2998,10 +3298,10 @@ end subroutine readreleasesB2
    if(.not.do_rel) cycle
    julian_date=juldate(F_date,F_time)
    if(instant_release) then
-      itra_part=int((julian_date-bdate)*86400)
+      itra_part=nint((julian_date-bdate)*86400)
    else
-      itra_part=sign(int(abs(julian_date-bdate)*86400/abs(lsynctime)+0.5) &
-         *lsynctime,int((julian_date-bdate)*86400))
+      itra_part=sign(nint(abs(julian_date-bdate)*86400/abs(lsynctime)+0.5) &
+         *lsynctime,nint((julian_date-bdate)*86400))
    endif
    x_part=(F_long-xlon0)/dx
    y_part=(F_lat-ylat0)/dy
@@ -3195,7 +3495,7 @@ end subroutine readreleasesB2
        ! Copie dans les tableaux finaux :
        do ipart = 1,numpart_date
           numpart_prev = numpart_prev +1
-          xtra1(numpart_prev) = modulo((xpart(ipart)-xlon0)/dx,real(nx))
+          xtra1(numpart_prev) = modulo((xpart(ipart)-xlon0)/dx,real(nx-1))
           ytra1(numpart_prev) = (ypart(ipart)-ylat0)/real(dy)
           ttra1(numpart_prev) = temppart(ipart)
           if(diabatic_Claus) then
