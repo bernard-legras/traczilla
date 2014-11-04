@@ -45,7 +45,7 @@
 !*******************************************************************************
 
       use commons
-      use lyapunov
+!      use lyapunov
       use isentrop_h
       use ecmwf_diab
       use mass_iso
@@ -206,6 +206,12 @@
           else
             call fixmultilayer(error)
           endif
+        case('AGEB')
+           call fixmultilayer_tropomask(error)
+           if (track_kill) then
+              allocate(x_kill(numpart),y_kill(numpart),z_kill(numpart))
+              allocate(it_kill(numpart),nstop_kill(numpart))
+           endif
         case('MOZAIC')
            if(interp_release) then
               call fixmozaicinterp(error)
@@ -221,11 +227,11 @@
            case('AASEII')
               call fixER2SPADEinterp(error)
            end select
-        case('ER2lyapou')
-           print *,'FLEXPART> initialize Lyapunov'
-           call fixER2SOLVEinterp(error)
-           call fix_perturb
-           call alloc_Lyapunov
+!        case('ER2lyapou')
+!           print *,'FLEXPART> initialize Lyapunov'
+!           call fixER2SOLVEinterp(error)
+!           call fix_perturb
+!           call alloc_Lyapunov
         case('CLAUS')
             if(delayed_initialization) then
               print *,'flexpart> delayed initialization'
