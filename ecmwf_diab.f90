@@ -744,7 +744,7 @@ end subroutine alloc_ecmwf_diab
 
       deallocate (wfname1,wfspec1,wftime1)
 
-      print *,'readavailable_diab> done'
+      print *,'readavailable_diab> done ',numbwf_diab
 
       return    
 
