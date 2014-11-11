@@ -171,12 +171,17 @@ end subroutine alloc_merra
 ! to get variable Ids
 ! (assume same grid)
   if(merra_diab) then
+    if(ideltas.gt.0) then
+      ifn=1
+    else
+      ifn=numbwf_diab
+    endif
     call check(NF90_OPEN(path_diab(1)(1:len_diab(1))//wfname_diab(ifn), &
       NF90_NOWRITE, ncid),1)
-    call check(NF90_INQ_VARID(ncid,'DTDTLWR',LWRId),23)
-    call check(NF90_INQ_VARID(ncid,'DTDTSWR',SWRId),23)
-    call check(NF90_INQ_VARID(ncid,'DTDTLWRCLR',LWRCLRId),23)
-    call check(NF90_INQ_VARID(ncid,'DTDTSWRCLR',SWRCLRId),23)
+    call check(NF90_INQ_VARID(ncid,'DTDTLWR',LWRId),24)
+    call check(NF90_INQ_VARID(ncid,'DTDTSWR',SWRId),25)
+    call check(NF90_INQ_VARID(ncid,'DTDTLWRCLR',LWRCLRId),26)
+    call check(NF90_INQ_VARID(ncid,'DTDTSWRCLR',SWRCLRId),27)
     call check(NF90_CLOSE(ncid),24)  
   endif
 
@@ -776,7 +781,7 @@ end subroutine alloc_merra
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
 ! Calculation of the potential temperature
   do k=nuvz-NPmass,nuvz
-     theta(:,:,k)=0.5*(tth(:,:,k,1)+tth(:,:,k,2))*facT(k)
+     theta(:,:,k)=0.5_dp*(tth(:,:,k,1)+tth(:,:,k,2))*facT(k)
   enddo
 !$OMP END DO
 !  print *,'mass before sigma ',OMP_GET_THREAD_NUM()
@@ -812,8 +817,8 @@ end subroutine alloc_merra
      flux(:,:)=wwh(:,:,k,n)*sigma(:,:,k)
      flux_lat(:)=sum(flux(0:nx-2,:),DIM=1)
      mean_sigma_lat(:)=sum(sigma(0:nx-2,:,k),DIM=1)
-     mass_flux(k)=0.5*dot_product(flux_lat(:),area_coefft_merra)
-     mean_sigma(k)=0.5*dot_product(mean_sigma_lat(:),area_coefft_merra)
+     mass_flux(k)=0.5_dp*dot_product(flux_lat(:),area_coefft_merra)
+     mean_sigma(k)=0.5_dp*dot_product(mean_sigma_lat(:),area_coefft_merra)
      mean_w(k)=mass_flux(k)/mean_sigma(k)
      wwh(:,:,k,n)=wwh(:,:,k,n)-mean_w(k)
   enddo
@@ -946,9 +951,9 @@ subroutine interpol_wind_merra &
       ddx=modulo(xt-float(ix),1.)
       ! accounts for the two polar regions
       if (yt<0) then
-         ddy=2*(yt+0.5)
+         ddy=2*(yt+0.5_dp)
       else if (yt>ny-1) then
-         ddy=2*(yt+0.5-ny)
+         ddy=2*(yt+0.5_dp-ny)
       else
          ddy=yt-float(jy)
       endif
@@ -1401,7 +1406,7 @@ subroutine interpol_wind_merra &
       ! singularities.
       ! Hence min are replaced by max and conversely, with respect to unmix.
       ! Interpolation is here only used to ensure monotonicity. (to be checked)
-      do while (minval(theta_diff) < tol)
+      do while ((minval(theta_diff) < tol) .and. nbunmix < 30)
         nbunmix=nbunmix+1
         id1=minloc(theta_diff(:))
         id=id1(1)+1
