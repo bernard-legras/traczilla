@@ -211,6 +211,16 @@
            if (track_kill) then
               allocate(x_kill(numpart),y_kill(numpart),z_kill(numpart))
               allocate(it_kill(numpart),nstop_kill(numpart))
+              it_kill(:)=ZERO_INIT
+              nstop_kill(:)=ZERO_INIT
+              x_kill(:)=MISSING
+              y_kill(:)=MISSING
+              z_kill(:)=MISSING
+           endif
+           if (track_cross) then
+              allocate(it_1800(numpart),it_2300(numpart))
+              it_1800(:)=ZERO_INIT
+              it_2300(:)=ZERO_INIT
            endif
         case('MOZAIC')
            if(interp_release) then
