@@ -100,7 +100,7 @@ contains
 
       integer :: i,j,itime,nstop, ix, jy
       integer :: loutnext,loutnext0
-      integer :: npproc,npstop(7),nb_bounce
+      integer :: npproc,npstop(7),nb_bounce, nerr
       integer :: count_clock_1,count_clock_2,count_rate,count_max
       integer :: next_time_orthog, prev_time_orthog
       integer, allocatable :: shuffle(:)
@@ -205,20 +205,20 @@ contains
 !*******************************************
 
         if(iso_mass) then
-          call getfields_iso(itime,nstop)
+          call getfields_iso(itime,nerr)
         else if (merra_data) then     
-          call getfields_merra(itime,nstop)
+          call getfields_merra(itime,nerr)
         else
-          call getfields(itime,nstop)
+          call getfields(itime,nerr)
         endif
-        if (nstop > 1) stop 'NO METEO FIELDS AVAILABLE'
+        if (nerr > 1) stop 'NO METEO FIELDS AVAILABLE'
         if(diabatic_w .and. ecmwf_diabatic_w) then
-          call getfields_diab(itime,nstop)
-          if (nstop > 1) stop 'NO DIAB FIELDS AVAILABLE'
+          call getfields_diab(itime,nerr)
+          if (nerr > 1) stop 'NO DIAB FIELDS AVAILABLE'
         endif
         if(diabatic_w .and. ecmwf_inct_w) then
-          call getfields_inct(itime,nstop)
-          if (nstop > 1) stop 'NO INCT FIELDS AVAILABLE'
+          call getfields_inct(itime,nerr)
+          if (nerr > 1) stop 'NO INCT FIELDS AVAILABLE'
         endif
 
 ! Switch off the diffusion if needed 
@@ -278,8 +278,17 @@ contains
           if (mod(ytr,4)==0 .and. mtr>2) dyr=dyr+1
         endif       
  
-! Reset tropotest
-        tropotest=.false. 
+! Set tropotest
+        if(AGEBactiv) then
+          tropotest=(mod(itime,loutprint)==0)
+          if (tropotest) then
+            read(tropunit,rec=dyr)buff
+            tropozdd=reshape(buff,(/nx,ny/))
+            write(*,'(" tropotest ",I4,2I2.2,I5)') ,ytr,mtr,dtr,dyr
+          endif
+        else
+          tropotest=.false.
+        endif
 
 ! Output of particle positions
         if((itime == loutnext0).and.(ipout == 1)) then
@@ -294,13 +303,9 @@ contains
        !     print *,'output of particle positions and T, format 105 ', &
        !       itime/86400,' days'
           else if (AGEBactiv) then
-            call partout_agef(itime)           
-            tropotest=.true.
-            read(tropunit,rec=dyr)buff
-            tropozdd=reshape(buff,(/nx,ny/))
-            write(*,'(" tropotest ",I4,2I2.2,I5)') ,ytr,mtr,dtr,dyr
+            call partout_agef(itime)     
           else
-            call partout_fast(itime)           !  dump particle position
+            call partout_fast(itime)
        !     print *,'output of particle positions format 102 ', &
        !        itime/86400,' days' 
           endif  
@@ -311,7 +316,13 @@ contains
             print *,'full backup of trajectories ',itime
           endif
           flush (6)
-        endif                                   ! interval, not at the end
+        endif
+        
+        if(mod(itime,loutsav)==0) then
+          call savsav(itime)
+          if (track_kill)  call savkill(itime)
+          if (track_cross) call savcross(itime)
+        endif                           
  
 ! Calculate Lyapunov exponents: TO BE UPDATED WITH I. PISSO CODE
 ! deactivated by default
@@ -353,13 +364,14 @@ contains
         call system_clock(count_clock_1,count_rate,count_max)
         if(trace_time) print *,'itime > ',itime
 
+! Beginning of the parallel section
 !$OMP PARALLEL DEFAULT(SHARED) SHARED(npproc,nb_bounce,npstop,shuffle,itime) &
 !$OMP PRIVATE(nstop,npproc_thread,nb_bounce_thread,npstop_thread,num_thread)
         npproc_thread=0
         nb_bounce_thread=0
         npstop_thread(:)=0
         num_thread=OMP_GET_THREAD_NUM()
-!$OMP DO SCHEDULE(RUNTIME) PRIVATE(i,j,dt,tint)
+!$OMP DO SCHEDULE(RUNTIME) PRIVATE(i,j,dt,tint,ix,jy,ddx,ddy)
         dopart: do i=1,numpart
           if (shuffling) then
              j=shuffle(i)
@@ -407,12 +419,13 @@ contains
 ! Apply simultaneously the duration test to discard parcels beyond maximum life
 !****************************************************************************** 
 ! It is assumed that the tropopause data have same grid as the wind
-! management of the date is done locally without the weight of 
+! Management of the date is done locally without the weight of 
 ! the available/getfields mech
-
+! This test has priority over those performed in advanceB
+            
             if (tropotest) then
               ix=floor(xtra1(j))
-              jy=floor(ytra1(j))
+              jy=min(ny-2,max(0,floor(ytra1(j))))
               ddx= xtra1(j)-ix
               ddy= ytra1(j)-jy
               if(ztra1(j)<tropozdd(ix,jy)*(1-ddx)*(1-ddy) &
@@ -420,6 +433,17 @@ contains
                          +tropozdd(ix,jy+1)*(1-ddx)*ddy &
                          +tropozdd(ix+1,jy+1)*ddx*ddy) nstop=6
               if (itra0(j)-itime > max_life_time) nstop=7
+              if (nstop >=6 .and. track_kill) then
+                it_kill(j)=itime
+                nstop_kill(j)=nstop
+                x_kill(j)=xlon0+xtra1(j)*dx
+                y_kill(j)=ylat0+ytra1(j)*dy
+                z_kill(j)=ztra1(j)
+              endif
+              if (track_cross) then
+                if(ztra1(j)>1800 .and. it_1800(j)==0) it_1800(j)=0
+                if(ztra1(j)>2300 .and. it_2300(j)==0) it_2300(j)=0
+              endif                       
             endif
 
 ! Calculate qv for final pressure and initial temperature
@@ -436,7 +460,7 @@ contains
 !*******************************************************
 
             if (nstop>1) then           
-              npstop_thread(nstop)=npstop_thread(nstop)+1             
+              npstop_thread(nstop)=npstop_thread(nstop)+1                                
 !             TEST    
 !              write(*,'(a,2i8,3f12.4)') ' timemanager > stopped parcel',&
 !                 j,nstop,xtra1(j),ytra1(j),ztra1(j)
@@ -467,18 +491,14 @@ contains
 !       print *,'THREAD ',num_thread,' completed'
 !$OMP END PARALLEL
 
-        if (mod(itime,96*lsynctime)==0) then
-          call system_clock(count_clock_2,count_rate,count_max)
-          write(*,'(a,i8,f10.2,a)') ' timemanager> npproc*, cpu ',&
-             npproc, float(count_clock_2-count_clock_1)/       &
+        if (mod(itime,loutprint)==0) then
+          call system_clock(count_clock_2,count_rate,count_max)        
+          write(*,'(a,i9,i6,f10.2,a)') ' timemanager> npproc*, bounce, cpu ',&
+             npproc, nb_bounce, float(count_clock_2-count_clock_1)/       &
              float(count_rate), 's'
           write(*,'(a,7i8)') ' timemanager> npstop ',npstop
           allocate (mask_part(numpart))
           mask_part(:) = itra1(:)==itime+lsynctime
-!         print*,'xtra1 ', minval(xtra1(1:numpart),DIM=1,MASK=mask_part), &
-!                          maxval(xtra1(1:numpart),DIM=1,MASK=mask_part)
-!         print*,'ytra1 ', minval(ytra1(1:numpart),DIM=1,MASK=mask_part), &
-!                          maxval(ytra1(1:numpart),DIM=1,MASK=mask_part)
           print*,'ztra1 ', minval(ztra1(1:numpart),DIM=1,MASK=mask_part), &
                            maxval(ztra1(1:numpart),DIM=1,MASK=mask_part), &
                            minloc(ztra1(1:numpart),DIM=1,MASK=mask_part), &
@@ -491,7 +511,7 @@ contains
           deallocate (mask_part)
           npstop(:)=0
         endif
-        if (nb_bounce >0) print *,'timemanager > nb bouncing ',nb_bounce
+!        if (nb_bounce >0) print *,'timemanager > nb bouncing ',nb_bounce
         
 !        if(npstop.eq.1) stop
           
