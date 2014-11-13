@@ -91,6 +91,10 @@ module commons
 ! switchnorth    use polar stereographic grid north of switchnorth
 ! switchsouth    use polar stereographic grid south of switchsouth
 
+!***************************
+! Reanalysis or other source
+!***************************
+      character(len=8) :: data_source
 
 !*********************************************
 ! Maximum dimensions of the input mother grids
@@ -109,9 +113,9 @@ module commons
 !                         for the transformed Cartesian coordinates
 
 
-!*********************************
-! Parameters for GRIB file decoding
-!*********************************
+!***********************************
+! Parameters for GRIB1 file decoding
+!***********************************
 
       integer, parameter :: jpack=4*nxmax*nymax,jpunp=4*jpack
 
@@ -160,6 +164,13 @@ module commons
       integer, parameter :: unitspecies=1,unitoutrecept=91,unitoutreceptppt=92
       integer, parameter :: unitER2_O3=81,unitER2_MG=82,unitER2_MM=83,unitER2_FP=84
       integer, parameter :: unitlsm=1,unitsurfdata=1,unitland=1,unitwesely=1
+      
+!***************
+! Missing values
+!***************
+
+      integer, parameter :: BIG_INT=2**30, ZERO_INIT=0
+      real, parameter :: MISSING=1.e99_dp
 
 !**********************************************
 ! constant pressure to define vertical velocity
@@ -224,15 +235,17 @@ module commons
 ! ideltas                 length of trajectory loop from beginning to
 !                         ending date (s)
 
-      integer :: loutstep,loutaver,loutsample,method,lsynctime,loffset,loffset2
+      integer :: loutstep,loutaver,loutsample,method,lsynctime, &
+                 loutprint,loutsav,loffset,loffset2
       logical :: savfull
 
 ! loffset [s]             offset time for the first output (useful if it is
 !                         not a multiple of loutstep)
 ! loffset2 [s]		  second offset of the first output if not in sequence
 !                         with the followers
-! loutstep [s]            gridded concentration output every loutstep seconds
-! loutaver [s]            concentration output is an average over [s] seconds
+! loutstep [s]            interval of position output to file
+! loutprint [s]           interval of diagnostic output to file
+! loutsav [s]            interval of dump to file
 ! loutsample [s]          sampling interval of gridded concentration output
 ! lsynctime [s]           synchronisation time of all particles
 ! method                  indicator which dispersion method is to be used
@@ -381,7 +394,8 @@ module commons
       character(len=128):: path_diab(2)
       integer len_diab(2)
 
-! path_diab               paths for diabatic directory and associated AVAILABLE file
+! path_diab               paths for diabatic directory and associated 
+!                         AVAILABLE file
 ! len_diab                lengths of the two previous strings
 		
 !****************************************************************************
@@ -399,8 +413,8 @@ module commons
 
 ! nuvz is used for u,v components
 ! nwz is used for w components (staggered grid)
-! nz is used for the levels in transformed coordinates (terrain-following Cartesian
-! coordinates)
+! nz is used for the levels in transformed coordinates (terrain-following 
+! Cartesian coordinates)
 
 ! nlev_ec  L              number of levels ECMWF model
 ! dx       L              grid distance in x direction
@@ -475,13 +489,14 @@ module commons
       integer                ::  latmin_Claus
       integer                ::  latmax_Claus
 
-!**************************************
-! Variables associated with parcel kill
-!**************************************
+!************************************************
+! Variables associated with parcel kill and cross
+!************************************************
       
-      logical :: track_kill
+      logical :: track_kill, track_cross
       real (dp), allocatable :: x_kill(:),y_kill(:),z_kill(:)
-      integer, allocatable   :: it_kill(:), nstp_kill(:)
+      integer, allocatable   :: it_kill(:), nstop_kill(:)
+      integer, allocatable   :: it_1800(:),it_2300(:)
 
 ! Fixed fields, unchangeable with time
 !*************************************
