@@ -693,14 +693,13 @@ contains
       logical, intent(out):: error
 
       error=.false.
-      print *,'##### restart run ####' 
    
 ! Open the file  
 !*************************************
 
       open(unitpartin,file=trim(path(2))//'kill', &
          form='unformatted',status='old')
-      print *,'restart > opened file'
+      print *,'readkill > opened file'
       read(unitpartin) lhead, outfmt
       read(unitpartin) 
       read(unitpartin) 
@@ -797,16 +796,14 @@ contains
       logical, intent(out):: error
 
       error=.false.
-      print *,'##### restart run ####' 
    
 ! Open the file  
 !*************************************
 
       open(unitpartin,file=trim(path(2))//'cross', &
          form='unformatted',status='old')
-      print *,'restart > opened file'
+      print *,'readcross > opened file'
       read(unitpartin) lhead, outfmt
-      read(unitpartin) 
       read(unitpartin) 
       read(unitpartin) 
       read(unitpartin) 
