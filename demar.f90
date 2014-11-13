@@ -86,12 +86,12 @@ contains
    ldirect,             & ! direction of integration
    ibdate, ibtime,      & ! beginnning date and time (YYYYMMDD, HHMISS)
    iedate, ietime,      & ! ending date and time (YYYYMMDD, HHMISS)
-   loutstep,            & ! time interval of concentration output [s]
-   loutaver,            & ! concentration output is an average over 
-                          ! loutaver [s]
+   loutstep,            & ! time interval of position output [s]
+   loutprint,           & ! time interval of printed diagnostics
    loutsample,          & ! average is computed from samples taken every 
                           ! loutsample [s]
    itsplit,             & ! time constant for particle splitting [s]
+   loutsav ,			& ! time interval of saving full fields
    lsynctime,           & ! synchronisation time interval for all particles[s]
    loffset,             & ! offset time for the first output [s]
                           ! (allows to start at any time)
@@ -116,6 +116,7 @@ contains
    restart,hrstart,     & ! restart run, hour labeling the restart file
    correct_vertwind,    & ! correcting vertical wind
    delay_switch_diff_off,& ! diffusion is switched off after this delay (in s)
+   data_source,         & ! source of the data (EI, MERRA, JRA-55)
    diabatic_w,          & ! diabatic velocities are used
    ecmwf_diabatic_w,    & ! diabatic velocities from ecmwf archive
    clear_sky,           & ! clear sky version of diabatic velocities
@@ -140,13 +141,14 @@ contains
 !-------------------------------------------
 
  error=.false.
- open(unitcommand,file=path(1)(1:len_path(1))//'COMMAND',status='old',err=999)
+ print *,trim(path(1))//'COMMAND'
+ open(unitcommand,file=trim(path(1))//'COMMAND',status='old',err=999)
 
 ! Check the format of the COMMAND file and call old readcommand
 ! if new heading with COMMAND in the first line is not detected
 !--------------------------------------------------------------
 
- epsil=1.e-3  ! must be consistent with the value in demar
+ epsil=1.e-3_dp  ! must be consistent with the value in demar
  read (unitcommand,'(a)') line
  if (index(line,'COMMAND') == 0 ) then
    close(unitcommand)
@@ -163,8 +165,10 @@ contains
  loutstep = 43200
  loutaver = 3600
  loutsample = 1800
- itsplit = 999999999
+ itsplit = BIG_INT
+ loutsav = BIG_INT
  lsynctime = 900
+ loutprint = 96*lsynctime
  loffset = 0
  loffset2 = 0
  ctl = 5.
@@ -206,6 +210,7 @@ contains
  mean_diab_output=.false.
  merra_data=.false.
  merra_diab=.false.
+ data_source='EI'
  
  read(unitcommand,NML=COMMAND)
  
@@ -449,8 +454,6 @@ contains
 ! decay               decay constant of species                                *
 ! dquer [um]          mean particle diameters                                  *
 ! dsigma              e.g. dsigma=10 or dsigma=0.1 means that 68% of the mass  *
-!                     are between 0.1*dquer and 10*dquer                       *
-! ireleasestart, ireleaseend [s] starting time and ending time of each release *
 ! npart               number of particles to be released                       *
 ! density [kg/m3]     density of the particles                                 *
 ! rm [s/m]            Mesophyll resistance                                     *
@@ -564,7 +567,8 @@ contains
     uniform_spread,     & ! activate uniform spread
     uniform_mesh,       & ! activate the uniform mesh in longitude
     tropodir,           & ! directory where to find the tropopause files
-    track_kill,		& ! track the killing of parcels
+    track_kill,		    & ! track the killing of parcels
+    track_cross,        & ! track the crossing of 1800K and 2300K surfaces
     shuffling             ! activate shuffling of parcels in timemanager
     
  namelist /AGE/         & 
@@ -622,6 +626,7 @@ contains
  external_pos0=.false.
  CLAUSactiv=.false.
  track_kill=.false.
+ track_cross=.false.
    
 ! Open the releases file and read user options
 !---------------------------------------------
@@ -643,7 +648,7 @@ contains
 !   return
 ! endif
 
- epsil=1.e-3
+ epsil=1.e-3_dp
 
  select case (release_plan)
 
@@ -679,7 +684,7 @@ contains
     ypoint1(1)=lat_min;  ypoint2(1)=lat_max
     mesh_size_lat=mesh_size
     mesh_size_long=mesh_size
-    uppertheta=2485.30
+    uppertheta=2485.30_dp
     if(iso_mass .or. diabatic_w .or. isentropic_motion) then
         delayed_initialization=.true.
         press2theta=.true.
@@ -736,6 +741,7 @@ contains
     print *,'readreleases> AGEB'
     AGEBactiv=.true.
     track_kill=.true.
+    track_cross=.true.
     numpoint=1
     theta_l=0.
     thetacut=10000._dp
@@ -744,7 +750,7 @@ contains
     uniform_spread=.true.
     uniform_mesh=.true.
     AccurateTemp=.true.
-    savfull=.true.
+    savfull=.false.
     nb_level=1
     long_min = xlon0
     long_max = xlon0 + (nx-1)*dx ! global assumed
@@ -1043,6 +1049,8 @@ contains
    return
  end  select
  close(unitreleases) 
+ 
+ call check_sav
 
  return
 
@@ -1095,7 +1103,7 @@ end subroutine readreleasesB2
       check_input_date_2 = 0
       if (ldirect.eq.1) then
         if ((jul1.lt.bdate).or.(jul1.gt.edate)) then
-          write(*,*) 'FLEXPART MODEL ERROR'
+          write(*,*) 'TRACZILLA MODEL ERROR'
           write(*,*) 'Release before simulation begins or '
           write(*,*) 'after simulation stops.'
           write(*,*) 'Make files COMMAND and RELEASES consistent.'
@@ -1104,7 +1112,7 @@ end subroutine readreleasesB2
         endif        
       else if (ldirect.eq.-1) then
         if ((jul1.lt.edate).or.(jul1.gt.bdate)) then
-          write(*,*) 'FLEXPART MODEL ERROR'
+          write(*,*) 'TRACZILLA MODEL ERROR'
           write(*,*) 'Release after simulation begins or '
           write(*,*) 'before simulation stops.'
           write(*,*) 'Make files COMMAND and RELEASES consistent.'
@@ -1117,12 +1125,22 @@ end subroutine readreleasesB2
       
       subroutine check_sample ()
       if (n_sample > 1) then
-        write(*,*) 'FLEXPART WARNING'
+        write(*,*) 'TRACZILLA WARNING'
         write(*,*) 'n_sample forced to 1'
         n_sample = 1
       endif
       return
       end subroutine check_sample
+      
+      subroutine check_sav
+      if(savfull .and. loutsav<BIG_INT) then
+        write(*,*) 'TRACZILLA WARNING'
+        write(*,*) 'savfull and loutsav both operate'
+        write(*,*)'savfull forced to .false.'
+        savfull=.false.
+      endif
+      return
+      end subroutine check_sav
 
 !===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FIXPARTICLESB @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -2034,14 +2052,22 @@ end subroutine readreleasesB2
    ypoint2(k) = (ypoint2(k)-ylat0)/dy
    if ((xpoint1(k) < 0.).or.(xpoint1(k) > nx-1+epsil2)) go to 999
    if ((xpoint2(k) < 0.).or.(xpoint2(k) > nx-1+epsil2)) go to 999
-   if ((ypoint1(k) < 0.).or.(ypoint1(k) > ny+epsil2)) go to 999
+!  Deactivated because it fails for MERRA due to the poles not belonging
+!  to the list of latitudes
+ !  if ((ypoint1(k) < 0.).or.(ypoint1(k) > ny+epsil2)) go to 999
    if ((ypoint2(k) < 0.).or.(ypoint2(k) > ny+epsil2)) go to 999
  enddo
  
  doyy: do yy=year_b,year_e  
 !  load the tropopause height in theta
+!  should have been generated with same grid, that is with an exyra column
    write(yyyy,'(I4)')yy
-   tropofile=trim(tropodir)//'/tropo-theta-EI-'//yyyy//'.bin'
+   select case (data_source)
+     case ('EI')
+       tropofile=trim(tropodir)//'/tropo-theta-EI-'//yyyy//'.bin'
+     case ('MERRA')
+       tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//yyyy//'.bin'
+   end select  
    open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
    if(mod(yy,4)==0) then
      year_length=366
@@ -2070,14 +2096,17 @@ end subroutine readreleasesB2
        dolayer: do k=1,numpoint
          zc=zpoint1(k)
          if (xglobal) then
-          xlm=xpoint2(k)
+           xlm=xpoint2(k)
          else
            xlm=xpoint2(2)+epsil
          endif
+         !print *,xpoint1(k),xpoint2(k)
+         !print *,ypoint1(k),ypoint2(k)
 
          yc = ypoint1(k)
          dolat: do while (yc < ypoint2(k)+epsil)
-           jy=floor(yc)
+           ! minmax for the case of the pole off the grid to avoid getting -1
+           jy=min(ny-2,max(0,floor(yc)))
            ddy=yc-jy
            ylat = (ylat0 + yc*dy)*pi/180._dp
 !          defined corrected longitude mesh if needed           
@@ -2100,6 +2129,7 @@ end subroutine readreleasesB2
              ddx=xc-ix
              ! test the tropopause
              ! it is assumed that the tropopause has same grid as the wind
+             ! Only true for the ERA-Interim at the moment
              if (zc < 380) then
                if (zc < tropoz(ix,jy,dyr)*(1-ddx)*(1-ddy) &
                        +tropoz(ix+1,jy,dyr)*(1-ddx)*ddy &
@@ -2130,6 +2160,13 @@ end subroutine readreleasesB2
    close(tropunit)
  enddo doyy
  deallocate(buff)
+ open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
+ write(unitpartout4) xtra1(1:numpart)
+ write(unitpartout4) ytra1(1:numpart)
+ write(unitpartout4) ztra1(1:numpart)
+ write(unitpartout4) itra0(1:numpart)
+ close(unitpartout4)
+
 
  print *,'fixmultilayer_tm > completed, layers, numpart ',numpoint, numpart
  return
@@ -2258,7 +2295,8 @@ end subroutine readreleasesB2
 !   Print a few lines
     print *,'setpos0fromext > packet_size, count_t ',packet_size,count_t
     print *,'setpos0fromext > ',maxpart,packet_size*count_t
-    print *,'setpos0fromext > min, max x ',minval(xtra_l),maxval(ytra_l)
+    print *,'setpos0fromext > min, max x ',minval(xtra_l),maxval(xtra_l)
+    print *,'setpos0fromext > min, max y ',minval(ytra_l),maxval(ytra_l)
     print *,'setpos0fromext > min, max z ',minval(ztra_l),maxval(ztra_l)
   
 !   Proceed with the initialization
