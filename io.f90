@@ -179,7 +179,12 @@ contains
           xyzt(1,nact)=xlon0+xtra1(i)*dx
           xyzt(2,nact)=ylat0+ytra1(i)*dy
           xyzt(3,nact)=ztra1(i)
-          xyzt(4,nact)=ttra1(i)
+          ! fix for the case of unallocated ttra1
+          if (allocated(ttra1)) then
+             xyzt(4,nact)=ttra1(i)
+          else
+             xyzt(4,nact)=MISSING
+          endif
         endif
       enddo dopart
       
@@ -400,16 +405,16 @@ contains
       read(unitpartin) ztra1(1:numpart)
       read(unitpartin) itra1(1:numpart)
       if (itra0_activ) then
-         if(.not.allocated(itra0)) allocate(itra0(maxpart))
+         if(.not.allocated(itra0)) allocate(itra0(numpart))
          read(unitpartin) itra0(1:numpart)
       endif
 !     CHECK WHETHER ALLOCATION IS NEEDED FOR THE OTHER TWO
       if (ttra1_activ) then
-         if(.not.allocated(ttra1)) allocate(ttra1(maxpart))
+         if(.not.allocated(ttra1)) allocate(ttra1(numpart))
          read(unitpartin) ttra1(1:numpart)
       endif
       if (qtra1_activ) then
-         if(.not.allocated(qtra1)) allocate(qtra1(maxpart))
+         if(.not.allocated(qtra1)) allocate(qtra1(numpart))
          read(unitpartin) qtra1(1:numpart)
       endif
       close(unitpartin)
