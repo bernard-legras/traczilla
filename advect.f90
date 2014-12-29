@@ -154,13 +154,15 @@ contains
         print *,'timemanager> allocate ttra1 and qtra1'
         if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
         if (.not.allocated(qtra1)) allocate (qtra1(maxpart))
+        print *,'allocated ttra1, qtra1'
 ! mixing ratio read if restart but here it is reinitalized
 ! mixing ratio initialized at the beginning, after each output or after restart
         qtra1=0.05_dp
       endif
 
-      if (AGEFactiv.or.merra_diab) then
+      if (AGEBactiv.or.AGEFactiv.or.merra_diab) then
         if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
+        print *,'allocated ttra1'
       endif
       
       if(AGEBactiv) then
@@ -252,7 +254,7 @@ contains
           endif
         endif
         if(itime==itime0 .and. TTLactiv) then
-           ! fake time step
+           ! fake time step in order to calculate the temperature
            do j=1,numpart
              call advanceB(j,itime,0.,nstop,xtra1(j),ytra1(j),ztra1(j),ttra1(j))
            enddo
@@ -266,7 +268,11 @@ contains
             inquire(unit=tropunit,opened=tropopen)
             if (tropopen) close(tropunit)
             write(yyyy,'(I4)') ytr
-            tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'
+            if (merra_data) then
+               tropofile=trim(tropodir)//'tropo-theta-MERRA-'//yyyy//'.bin'
+            else
+               tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'
+            endif
             open(tropunit,file=tropofile,access='direct',status='old', &
               recl=4*ny*nx)
             print *,'opening tropopause file for ',yyyy
@@ -451,7 +457,7 @@ contains
             if(TTLactiv) then
               ttra1(j)=tint
               qtra1(j)=min(qtra1(j),satratio(p0*exp(-ztra1(j)),tint))
-            else if (AGEFactiv.or.merra_diab) then
+            else if (AGEBactiv.or.AGEFactiv.or.merra_diab) then
               ttra1(j)=tint
             endif
            
