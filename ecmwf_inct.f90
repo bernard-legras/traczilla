@@ -915,6 +915,8 @@ subroutine interpol_wind_theta_inct   &
 ! Calculates the theta values on the four adjacent columns if required
 !*********************************************************************
 
+#if defined(PAR_RUN)
+#else
       if(.not.theta_col(ix,jy,memind(1)))   call calc_col_theta(ix,jy,memind(1))
       if(.not.theta_col(ix,jy,memind(2)))   call calc_col_theta(ix,jy,memind(2))
       if(.not.theta_col(ix,jyp,memind(1)))  call calc_col_theta(ix,jyp,memind(1))
@@ -923,6 +925,7 @@ subroutine interpol_wind_theta_inct   &
       if(.not.theta_col(ixp,jy,memind(2)))  call calc_col_theta(ixp,jy,memind(2))
       if(.not.theta_col(ixp,jyp,memind(1))) call calc_col_theta(ixp,jyp,memind(1))
       if(.not.theta_col(ixp,jyp,memind(2))) call calc_col_theta(ixp,jyp,memind(2))
+#endif
 
 ! Determine the level below the current position for u,v
 !*******************************************************
