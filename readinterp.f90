@@ -1157,20 +1157,25 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 !       declared in the PBS preamble
 !       This is just inducing a waste of resources which can be significant
 !       when parcels are within a localized cloud
-        if(OMP_GET_NUM_PROCS()==1) then 
-          theta_col(:,:,n)=.false.
-          theta_inv_col(:,:,n)=.false.
-          print *,'NOCOL'
-        else
+!        if(OMP_GET_NUM_PROCS()==1) then 
+!          theta_col(:,:,n)=.false.
+!          theta_inv_col(:,:,n)=.false.
+!          print *,'NOCOL'
+!        else
+#if defined(PAR_RUN)
 !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(i,j)
-          do j=0,ny-1
-             do i=0,nx-1
-                call calc_col_theta(i,j,n)
-             enddo
-          enddo
+        do j=0,ny-1
+           do i=0,nx-1               
+             call calc_col_theta(i,j,n)
+           enddo
+        enddo
 !$OMP END PARALLEL DO
-        endif
-      endif
+#else
+        theta_col(:,:,n)=.false.
+        theta_inv_col(:,:,n)=.false.
+#endif
+!        endif
+      endif 
 
 !      surfstr(:,:,1,n)=sqrt(ewss(:,:)**2+nsss(:,:)**2)
 
