@@ -15,8 +15,6 @@ ifeq ($(TARGET),AMD64-88)
   MAIN = TRACZILLA-D
   CFLAGS = -msse -m64 -DAMD64
   FFLAGS  = -fast -Mvect=sse -i8 -r8 -tp k8-64 -Minfo -Mextend -byteswapio
-#  CFLAGS = -g -m64 -DAMD64
-#  FFLAGS  = -g -i8 -r8 -tp k8-64 -Minfo -Mextend -byteswapio
   LDFLAGS1  = -L/usr/local64/lib -lgrib
 endif
 ifeq ($(TARGET),AMD64-84)
@@ -31,14 +29,7 @@ ifeq ($(TARGET),AMD64-44)
   CC = pgcc
   #CC = pgcc
   CFLAGS = -fastsse -std=c89 -tp amd64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Bstatic 
-  #CFLAGS = -fastsse -tp amd64 -Minfo -Mbounds -Ktrap=inv,divz,ovf -Bstatic 
-  #CFLAGS = -fastsse -tp k8-64 
-  #FFLAGS  = -fastsse -tp k8-64 -Minfo -Mextend -byteswapio
   FFLAGS = -Mextend -byteswapio -tp amd64 -fastsse -O2 -Minfo -Minline -Bstatic -Ktrap=inv,divz,ovf
-  #FFLAGS = -Mextend -byteswapio -tp amd64 -Minfo -Bstatic -Mbounds -Ktrap=inv,divz,ovf
-  #FFLAGS = -Mextend -byteswapio -tp amd64 -fastsse -O2 -Minfo -Minline  -Bstatic
-  #FFLAGS = -Mextend -byteswapio -tp amd64 -Mbounds -g -Minfo -Bstatic
-  #LDFLAGS1  = -L/net/gluck/home/priv/legras/install64/src/NgribexLinux -lgrib44
   LDFLAGS1 = -L$(HOME)/lib.amd64 -lgribex -lcom
 endif
 ifeq ($(TARGET),X64-par)
@@ -47,8 +38,8 @@ ifeq ($(TARGET),X64-par)
   CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
   #FFLAGS = -I$(HOME)/local/include -gopt -mp -Mbounds -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
   # include needed for netcdf.mod
-  FFLAGS = -I$(HOME)/local/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
-  #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
+  FFLAGS = -I$(HOME)/local/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -I$(HOME)/local/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds
   LDFLAGS1 = -rpath $(HOME)/local/lib.x64 -L$(HOME)/local/lib.x64 -lgribex -lcom -lnetcdf -lnetcdff
 endif
 ifeq ($(TARGET),X64-par-ng)
@@ -56,21 +47,16 @@ ifeq ($(TARGET),X64-par-ng)
   CC = pgcc
   CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
   # include needed for netcdf.mod
-  FFLAGS = -I$(HOME)/local-ng/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
   #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
   LDFLAGS1 = -rpath $(HOME)/local-ng/lib -L$(HOME)/local-ng/lib -lgribex -lcom -lnetcdf -lnetcdff
 endif
-ifeq ($(TARGET),X64)
-  MAIN = TRACZILLA-TT
+ifeq ($(TARGET),X64-ng)
+  MAIN = TRACZILLA-TT-ng
   CC = pgcc
   CFLAGS = -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
-  FFLAGS = -I$(HOME)/local/include -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
-  #FFLAGS = -I$(HOME)/local/include -Mextend -byteswapio -tp x64 -g -Ktrap=inv,divz,ovf
-  #CFLAGS = -fastsse -tp x64 -O2 -Minfo -Mbounds  
-  #FFLAGS = -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds -I$(HOME)/local/include
-  #FFLAGS = -Mextend -byteswapio -tp x64 -Minfo -Mbounds -Bstatic -Ktrap=inv,divz,ovf 
-  #FFLAGS = -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Mcache_align -Msmartalloc
-  LDFLAGS1 = -rpath $(HOME)/local/lib.x64 -L$(HOME)/local/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local/grib_api/lib -lgrib_api_f90 -lgrib_api 
+  FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
 endif
 ifeq ($(TARGET),win)
   MAIN = TRACZILLA-win
@@ -79,12 +65,6 @@ ifeq ($(TARGET),win)
   FFLAGS = -O2 -fopenmp -pedantic -std=f2003 -Wall -fconvert=swap -fall-intrinsics -fmax-errors=0
   CFLAGS = -O2 
   LDFLAGS1 =
-endif
-ifeq ($(TARGET),IFC)
-  FC = ifc
-  MAIN = TRACZILLA
-  FFLAGS  = -132 -Vaxlib
-  LDFLAGS1  = -L/net/parker/do2/privat/install-src1/gribexLinux-ifc -lgrib
 endif
 
 .SUFFIXES :	.f90
