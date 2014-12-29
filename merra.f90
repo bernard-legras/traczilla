@@ -46,6 +46,7 @@ real :: missing_value
 real, allocatable :: PressLev(:), facT(:), LogPressLev(:), pmc_merra(:)
 real*8, allocatable :: grid_lat(:), grid_lon(:),grid_ver(:)
 real, allocatable :: area_coefft_merra(:)
+!real, allocatable :: theta_prof(:,:)
 integer :: NPMass
 
 ! PressLev [Pa]         pressure levels
@@ -194,6 +195,8 @@ end subroutine alloc_merra
   ny = NbLat
   nuvz=NbPress
   nwz=NbPress
+! Allocate theta_prof needed in the interpolation
+!  allocate(theta_prof(NbPress,2))
 ! Turn press levels into Pa (they are given in hPa)
   PressLev(:)=100*grid_ver(:) 
 ! Conversion from T to theta tendencies
@@ -699,19 +702,25 @@ end subroutine alloc_merra
 !       Notice that a global calculation of theta (without sorting) is already
 !       done if mass correction is activated
 
-        if(num_threads==1) then 
-          theta_col(:,:,n)=.false.
-          theta_inv_col(:,:,n)=.false.
+!        if(num_threads==1) then 
+!          theta_col(:,:,n)=.false.
+!          theta_inv_col(:,:,n)=.false.
 !          print *,'NOCOL'
-        else
+!        else
+#if defined(PAR_RUN)
 !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(i,j)
-          do j=-1,ny
+         do j=-1,ny
              do i=0,nx-1
                 call calc_col_theta_merra(i,j,n)
              enddo
-          enddo
+         enddo
 !$OMP END PARALLEL DO
-        endif
+         print *,'COL_THETA'
+#else
+         theta_col(:,:,n)=.false.
+         theta_inv_col(:,:,n)=.false.
+#endif
+!        endif
   endif
 
   return
@@ -786,7 +795,7 @@ end subroutine alloc_merra
 !$OMP END DO
 !  print *,'mass before sigma ',OMP_GET_THREAD_NUM()
 !  allocate(delta_theta(0:nx-1,0:ny-1))
-!$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k,i)
+!$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
   do k=nuvz-NPMass+1,nuvz-1
 !     delta_theta=theta(:,:,k+1)-theta(:,:,k-1)
 !     print *,k,minval(minval(abs(delta_theta),dim=1),dim=1)
@@ -933,7 +942,8 @@ subroutine interpol_wind_merra &
       integer :: ix,jy,ixp,jyp,i0,j0,idxy
       real :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
       real :: psl0,psup0,pinf0,pisup0,piinf0
-      real, allocatable :: theta_prof(:,:)
+      !real, allocatable :: theta_prof(:,:)
+      real :: theta_prof(250,2)
       integer :: i,j,k
 
 !********************************************
@@ -1001,10 +1011,13 @@ subroutine interpol_wind_merra &
       
       else if (merra_diab) then
       
-        allocate (theta_prof(NbPress,2))
+        !allocate (theta_prof(NbPress,2))
       
 !       Calculate the values on the four adjacent corners if required      
+   
+#if defined(PAR_RUN)
 
+#else
         if(.not.theta_col(ix,jy,memind(1)))   call calc_col_theta_merra(ix,jy,memind(1))
         if(.not.theta_col(ix,jy,memind(2)))   call calc_col_theta_merra(ix,jy,memind(2))
         if(.not.theta_col(ix,jyp,memind(1)))  call calc_col_theta_merra(ix,jyp,memind(1))
@@ -1013,6 +1026,7 @@ subroutine interpol_wind_merra &
         if(.not.theta_col(ixp,jy,memind(2)))  call calc_col_theta_merra(ixp,jy,memind(2))
         if(.not.theta_col(ixp,jyp,memind(1))) call calc_col_theta_merra(ixp,jyp,memind(1))
         if(.not.theta_col(ixp,jyp,memind(2))) call calc_col_theta_merra(ixp,jyp,memind(2))
+#endif
 
 !       Calculate the mean theta profile at the location of the parcel
 
@@ -1079,7 +1093,7 @@ subroutine interpol_wind_merra &
 !           write(*,'(8g12.5)'),theta_g(:,ix,jy,1)
 !        endif
         
-        deallocate(theta_prof) 
+        !deallocate(theta_prof) 
         
       else
         stop 999
