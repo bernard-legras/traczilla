@@ -25,8 +25,8 @@
 module readinterp
 use commons
 implicit none
-private locuv, locuv2, locw, locw2
-private check_nx, check_ny, check_nuvz, check_nwz, printerror
+private :: locuv, locuv2, locw, locw2
+private :: check_nx, check_ny, check_nuvz, check_nwz, printerror
 
 contains
 !===============================================================================
@@ -56,7 +56,7 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer i
+      integer :: i
       logical, intent(out)::error
 
       character(len=*), intent(in):: pathfile
@@ -130,13 +130,13 @@ contains
 !*******************************************************************************
       
       use date
-      logical error,toobig
-      integer i,j,idiff,ldat,ltim
-      integer year, month, day
-      real (dbl) :: jul,beg,end
+      logical :: error,toobig
+      integer :: i,j,idiff,ldat,ltim
+      integer :: year, month, day
+      real(dbl) :: jul,beg,end
       character(len=16):: fname,spec
-      character(len=16), allocatable:: wfname1(:),wfspec1(:)
-      integer, allocatable:: wfldat1(:),wfltim1(:),wftime1(:)
+      character(len=16), allocatable :: wfname1(:),wfspec1(:)
+      integer, allocatable :: wfldat1(:),wfltim1(:),wftime1(:)
 
       error=.false.
       allocate(wfname1(maxwf),wfspec1(maxwf), &
@@ -312,7 +312,7 @@ contains
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ GRIDCHECK @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 !=====|==1=========2=========3=========4=========5=========6=========7=========8
 
-	subroutine gridcheck(oronew,error)
+      subroutine gridcheck(oronew,error)
 !**********************************************************************
 !                                                                     * 
 !             TRAJECTORY MODEL SUBROUTINE GRIDCHECK                   *
@@ -586,6 +586,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 
       numskip=nlev_ec-nuvz  ! number of ecmwf model layers not used
                             ! by trajectory model
+      allocate (akm(nwz),bkm(nwz))
       do  i=1,nwz
         j=numskip+i
         k=nlev_ec+1+numskip+i
@@ -599,7 +600,8 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
 ! Assign the 10 m winds to an artificial model level with akz=0 and bkz=1.0,
 ! i.e. ground level
 !*****************************************************************************
- 
+       
+      allocate (akz(nuvz+1),bkz(nuvz+1))
       akz(1)=0.
       bkz(1)=1.0
       do i=1,nuvz
@@ -909,7 +911,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
       character(len=1):: yoper
       logical :: hflswitch,strswitch
       
-      integer :: OMP_GET_NUM_PROCS
+!      integer :: OMP_GET_NUM_PROCS
 
       data yoper/'D'/
 
