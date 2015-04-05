@@ -875,7 +875,7 @@ subroutine interpol_wind_theta_inct   &
       real dt1_diab,dt2_diab,dtt_diab
       real dt1_inct,dt2_inct,dtt_inct
       real tr(4,2),trp(4,2),u(4,2),v(4,2),wd(4,2),wi(4,2),tp(4,2)
-      integer m,indexh,indz(4,2)
+      integer m,indexh,indexh_diab,indexh_inct,indz(4,2)
       integer ix,jy,ixp,jyp,i0,j0,idxy
       real ddx,ddy,rddx,rddy,p1,p2,p3,p4
       real psl0,psup0,pinf0,pisup0,piinf0
@@ -902,12 +902,18 @@ subroutine interpol_wind_theta_inct   &
       dt1=float(itime-memtime(1))
       dt2=float(memtime(2)-itime)
       dtt=1./(dt1+dt2)
+      dt1=dt1*dtt
+      dt2=dt2*dtt
       dt1_diab=float(itime-memtime_diab(1))
       dt2_diab=float(memtime_diab(2)-itime)
       dtt_diab=1./(dt1_diab+dt2_diab)
+      dt1_diab=dt1_diab*dtt_diab
+      dt2_diab=dt2_diab*dtt_diab
       dt1_inct=float(itime-memtime_inct(1))
       dt2_inct=float(memtime_inct(2)-itime)
       dtt_inct=1./(dt1_inct+dt2_inct)
+      dt1_inct=dt1_inct*dtt_inct
+      dt2_inct=dt2_inct*dtt_inct
 
 ! Calculates the theta values on the four adjacent columns if required
 !*********************************************************************
@@ -1019,6 +1025,8 @@ subroutine interpol_wind_theta_inct   &
       case('log')
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
+          indexh_inct=memind_inct(m)
             
             u(1,m)=(uupol(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + uupol(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
@@ -1026,11 +1034,11 @@ subroutine interpol_wind_theta_inct   &
             v(1,m)=(vvpol(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + vvpol(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(log(theta)-log(trp(1,m))) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_inct(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh_inct)*(log(theta)-log(trp(1,m))) &
+                  + w_inct(ix ,jy ,indz(1,m)+1,indexh_inct)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
             u(2,m)=(uupol(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + uupol(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
@@ -1038,11 +1046,11 @@ subroutine interpol_wind_theta_inct   &
             v(2,m)=(vvpol(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + vvpol(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
-            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(log(theta)-log(trp(2,m))) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))   
-            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_inct(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh_inct)*(log(theta)-log(trp(2,m))) &
+                  + w_inct(ixp,jy ,indz(2,m)+1,indexh_inct)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
             u(3,m)=(uupol(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + uupol(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
@@ -1050,11 +1058,11 @@ subroutine interpol_wind_theta_inct   &
             v(3,m)=(vvpol(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + vvpol(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(log(theta)-log(trp(3,m))) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_inct(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh_inct)*(log(theta)-log(trp(3,m))) &
+                  + w_inct(ix ,jyp,indz(3,m)+1,indexh_inct)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
             u(4,m)=(uupol(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + uupol(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
@@ -1062,11 +1070,11 @@ subroutine interpol_wind_theta_inct   &
             v(4,m)=(vvpol(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + vvpol(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(log(theta)-log(trp(4,m))) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_inct(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh_inct)*(log(theta)-log(trp(4,m))) &
+                  + w_inct(ixp,jyp,indz(4,m)+1,indexh_inct)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1080,6 +1088,8 @@ subroutine interpol_wind_theta_inct   &
       
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
+          indexh_inct=memind_inct(m)
             
             u(1,m)=(uupol(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
                   + uupol(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
@@ -1087,11 +1097,11 @@ subroutine interpol_wind_theta_inct   &
             v(1,m)=(vvpol(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
                   + vvpol(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
                   / (tr(1,m)-trp(1,m))
-            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
+            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(theta-trp(1,m))  &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(tr(1,m)-theta))  &
                   / (tr(1,m)-trp(1,m))
-            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
-                  + w_inct(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
+            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh_inct)*(theta-trp(1,m))  &
+                  + w_inct(ix ,jy ,indz(1,m)+1,indexh_inct)*(tr(1,m)-theta))  &
                   / (tr(1,m)-trp(1,m))
             u(2,m)=(uupol(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
                   + uupol(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
@@ -1099,11 +1109,11 @@ subroutine interpol_wind_theta_inct   &
             v(2,m)=(vvpol(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
                   + vvpol(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
                   / (tr(2,m)-trp(2,m))
-            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
+            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(theta-trp(2,m))  &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(tr(2,m)-theta))  &
                   / (tr(2,m)-trp(2,m))
-            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
-                  + w_inct(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
+            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh_inct)*(theta-trp(2,m))  &
+                  + w_inct(ixp,jy ,indz(2,m)+1,indexh_inct)*(tr(2,m)-theta))  &
                   / (tr(2,m)-trp(2,m))
             u(3,m)=(uupol(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
                   + uupol(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
@@ -1111,11 +1121,11 @@ subroutine interpol_wind_theta_inct   &
             v(3,m)=(vvpol(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
                   + vvpol(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
                   / (tr(3,m)-trp(3,m))
-            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
+            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(theta-trp(3,m))  &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(tr(3,m)-theta))  &
                   / (tr(3,m)-trp(3,m))
-            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
-                  + w_inct(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
+            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh_inct)*(theta-trp(3,m))  &
+                  + w_inct(ix ,jyp,indz(3,m)+1,indexh_inct)*(tr(3,m)-theta))  &
                   / (tr(3,m)-trp(3,m))
             u(4,m)=(uupol(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
                   + uupol(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
@@ -1123,11 +1133,11 @@ subroutine interpol_wind_theta_inct   &
             v(4,m)=(vvpol(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
                   + vvpol(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
                   / (tr(4,m)-trp(4,m))
-            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
+            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(theta-trp(4,m))  &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(tr(4,m)-theta))  &
                   / (tr(4,m)-trp(4,m))
-            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
-                  + w_inct(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
+            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh_inct)*(theta-trp(4,m))  &
+                  + w_inct(ixp,jyp,indz(4,m)+1,indexh_inct)*(tr(4,m)-theta))  &
                   / (tr(4,m)-trp(4,m))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1146,6 +1156,8 @@ subroutine interpol_wind_theta_inct   &
       case('log')      
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
+          indexh_inct=memind_inct(m)
 
             u(1,m)=(uuh(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) & 
                   + uuh(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
@@ -1153,11 +1165,11 @@ subroutine interpol_wind_theta_inct   &
             v(1,m)=(vvh(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + vvh(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(log(theta)-log(trp(1,m))) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_inct(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh_inct)*(log(theta)-log(trp(1,m))) &
+                  + w_inct(ix ,jy ,indz(1,m)+1,indexh_inct)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
             u(2,m)=(uuh(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + uuh(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
@@ -1165,11 +1177,11 @@ subroutine interpol_wind_theta_inct   &
             v(2,m)=(vvh(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + vvh(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
-            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(log(theta)-log(trp(2,m))) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
-            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_inct(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh_inct)*(log(theta)-log(trp(2,m))) &
+                  + w_inct(ixp,jy ,indz(2,m)+1,indexh_inct)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
             u(3,m)=(uuh(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + uuh(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
@@ -1177,11 +1189,11 @@ subroutine interpol_wind_theta_inct   &
             v(3,m)=(vvh(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + vvh(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(log(theta)-log(trp(3,m))) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_inct(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh_inct)*(log(theta)-log(trp(3,m))) &
+                  + w_inct(ix ,jyp,indz(3,m)+1,indexh_inct)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
             u(4,m)=(uuh(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + uuh(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
@@ -1189,11 +1201,11 @@ subroutine interpol_wind_theta_inct   &
             v(4,m)=(vvh(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + vvh(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(log(theta)-log(trp(4,m))) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_inct(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh_inct)*(log(theta)-log(trp(4,m))) &
+                  + w_inct(ixp,jyp,indz(4,m)+1,indexh_inct)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1207,6 +1219,8 @@ subroutine interpol_wind_theta_inct   &
       
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
+          indexh_inct=memind_inct(m)
 
             u(1,m)=(uuh(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
                   + uuh(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
@@ -1214,11 +1228,11 @@ subroutine interpol_wind_theta_inct   &
             v(1,m)=(vvh(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
                   + vvh(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
                   / (tr(1,m)-trp(1,m))
-            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
+            wd(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(theta-trp(1,m)) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(tr(1,m)-theta)) &
                   / (tr(1,m)-trp(1,m))  
-            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
-                  + w_inct(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
+            wi(1,m)=(w_inct(ix ,jy ,indz(1,m)  ,indexh_inct)*(theta-trp(1,m)) &
+                  + w_inct(ix ,jy ,indz(1,m)+1,indexh_inct)*(tr(1,m)-theta)) &
                   / (tr(1,m)-trp(1,m))  
             u(2,m)=(uuh(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
                   + uuh(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
@@ -1226,11 +1240,11 @@ subroutine interpol_wind_theta_inct   &
             v(2,m)=(vvh(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
                   + vvh(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
                   / (tr(2,m)-trp(2,m))
-            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
+            wd(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(theta-trp(2,m)) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(tr(2,m)-theta)) &
                   / (tr(2,m)-trp(2,m))
-            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
-                  + w_inct(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
+            wi(2,m)=(w_inct(ixp,jy ,indz(2,m)  ,indexh_inct)*(theta-trp(2,m)) &
+                  + w_inct(ixp,jy ,indz(2,m)+1,indexh_inct)*(tr(2,m)-theta)) &
                   / (tr(2,m)-trp(2,m))
             u(3,m)=(uuh(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
                   + uuh(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
@@ -1238,11 +1252,11 @@ subroutine interpol_wind_theta_inct   &
             v(3,m)=(vvh(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
                   + vvh(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
                   / (tr(3,m)-trp(3,m))
-            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
+            wd(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(theta-trp(3,m)) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(tr(3,m)-theta)) &
                   / (tr(3,m)-trp(3,m))
-            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
-                  + w_inct(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
+            wi(3,m)=(w_inct(ix ,jyp,indz(3,m)  ,indexh_inct)*(theta-trp(3,m)) &
+                  + w_inct(ix ,jyp,indz(3,m)+1,indexh_inct)*(tr(3,m)-theta)) &
                   / (tr(3,m)-trp(3,m))
             u(4,m)=(uuh(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
                   + uuh(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
@@ -1250,11 +1264,11 @@ subroutine interpol_wind_theta_inct   &
             v(4,m)=(vvh(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
                   + vvh(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
                   / (tr(4,m)-trp(4,m))
-            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
+            wd(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(theta-trp(4,m)) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(tr(4,m)-theta)) &
                   / (tr(4,m)-trp(4,m))
-            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
-                  + w_inct(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
+            wi(4,m)=(w_inct(ixp,jyp,indz(4,m)  ,indexh_inct)*(theta-trp(4,m)) &
+                  + w_inct(ixp,jyp,indz(4,m)+1,indexh_inct)*(tr(4,m)-theta)) &
                   / (tr(4,m)-trp(4,m))
 
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1347,11 +1361,11 @@ subroutine interpol_wind_theta_inct   &
 ! 3.) Temporal interpolation (linear)
 !************************************
 
-      dxdt=(u1(1)*dt2+u1(2)*dt1)*dtt
-      dydt=(v1(1)*dt2+v1(2)*dt1)*dtt
-      dzdt=(w1d(1)*dt2_diab+w1d(2)*dt1_diab)*dtt_diab &
-          +(w1i(1)*dt2_inct+w1i(2)*dt1_inct)*dtt_inct
-      if(AccurateTemp) tint=(tp1(1)*dt2+tp1(2)*dt1)*dtt
+      dxdt=u1(1)*dt2+u1(2)*dt1
+      dydt=v1(1)*dt2+v1(2)*dt1
+      dzdt=w1d(1)*dt2_diab+w1d(2)*dt1_diab &
+          +w1i(1)*dt2_inct+w1i(2)*dt1_inct
+      if(AccurateTemp) tint=tp1(1)*dt2+tp1(2)*dt1
       !if(debug_out) &
       ! print "('interpol>',i3,' P ',3f7.0,' T ',3f7.2,' TH ',3f7.2)", & ! test
       !   indz(1,1),p0*(theta/tint)**(-1/kappa),&
