@@ -117,10 +117,10 @@ end subroutine alloc_iso
 !                                                                     *
 !**********************************************************************
 
-  real sizesouth,sizenorth
-  integer ifn, lf, Nt, Nlt, Nlg, jl
+  real(dp) :: sizesouth,sizenorth
+  integer :: ifn, lf, Nt, Nlt, Nlg, jl
  
-  logical error
+  logical :: error
 
   error=.false.
 
@@ -953,7 +953,8 @@ subroutine interpol_wind_iso&
 !       estimated from the data on the lower left corner at first time
 !       of the interval, for a better estimate using the closest point
 !       activate the first following line and deactivate the second one 
-!       call sort_hor_distance       
+!       call sort_hor_distance
+        indexh=memind(2)       
         i0=ix; j0=jy; idxy=1
         pisup0 = cpa * tth(i0,j0,indz(idxy,1)+1,indexh)/trp(idxy,1)
         piinf0 = cpa * tth(i0,j0,indz(idxy,1),indexh)/tr(idxy,1)
