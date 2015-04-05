@@ -33,20 +33,19 @@ module isentrop_h
 !**************************************
 
 use commons
-implicit none
-save 
+implicit none 
 
-     logical diabatic_w, isentropic_motion, theta_bounds
+     logical,save :: diabatic_w, isentropic_motion, theta_bounds
 
 ! diabatic_w              vertical velocity is from heating rates
 ! isentropic_motion       use theta as vertical coordinate
 !                         and interpolate wind to theta level
 ! theta_bounds            bounds theta variations within local limits
      
-      integer lower_theta_level, upper_theta_level
-      real, dimension(:), allocatable :: theta_part
-      real, dimension(:,:,:,:), allocatable:: theta_g
-      logical, dimension(:,:,:), allocatable:: theta_col,theta_inv_col
+      integer, save:: lower_theta_level, upper_theta_level
+      real(dp), save, allocatable :: theta_part(:)
+      real(dp), save, allocatable:: theta_g(:,:,:,:)
+      logical, save, allocatable:: theta_col(:,:,:),theta_inv_col(:,:,:)
       
  ! theta_part          theta for each particle (unused)
  ! theta_g             theta for the ECMWF data, on the grid
