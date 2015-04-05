@@ -43,7 +43,7 @@
 ! Constants:                                                                   *
 !                                                                              *
 !*******************************************************************************
-
+       
       use commons
 !      use lyapunov
       use isentrop_h
@@ -51,20 +51,21 @@
       use mass_iso
       use ecmwf_inct
       use merra
+      use jra55
       use thermo
       use advect
       use date
       use demar
       implicit none
 
-      integer i
-      logical error,oronew
+      integer :: i
+      logical :: error,oronew
 
       character(len=256):: pathfile
       
-      integer OMP_GET_NUM_PROCS, OMP_GET_NUM_THREADS
+      integer :: OMP_GET_NUM_PROCS, OMP_GET_NUM_THREADS
       
-      integer iargc
+      integer :: iargc
     
 ! Determines the number of threads for parallel run
 !**************************************************
@@ -96,6 +97,7 @@
 ! based on backward compatible namelists unlike FLEXPART
 ! defines the release plan
       call readcommandB(error)
+      
       if (error) goto 999
        
 ! Read the age classes to be used
@@ -112,7 +114,8 @@
 
       call readavailable(error)
       if(error) goto 999
-      if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_diab) ) then
+      if(diabatic_w .and. & 
+        (ecmwf_diabatic_w.or.merra_diab.or.jra55_diab) ) then
         call readpaths_diab(pathfile,error)
         call readavailable_diab(error)
         if (error) goto 999
@@ -131,6 +134,8 @@
         call gridcheck_iso(error)
       else if (merra_data) then
         call gridcheck_merra(error)
+      else if (jra55_data) then
+        call gridcheck_jra55(error)
       else
 ! standard FLEXPART wind grib files
         call gridcheck(oronew,error)
@@ -143,18 +148,11 @@
       if (ecmwf_diabatic_w.and.mass_correction) call diab_mass_init
       if (ecmwf_inct_w.and.mass_correction) call diab_mass_inct_init
       if (merra_diab.and.mass_correction) call diab_mass_merra_init
+      if (jra55_diab.and.mass_correction) call diab_mass_jra55_init
 
-! Read the chemical species table
-!********************************
-! deactivated
-!      call readspecies(error)
-!      if (error) goto 999
-
-! Read the orography used by the ECMWF model
-!*******************************************
-! deactivated
-!      call readoro(oronew,error)
-!      if (error) goto 999
+! Allocate the 3D fields
+!***********************
+      call alloc_3D
 
 ! Read the parameters of the release plan defined in COMMAND
 !***********************************************************
@@ -207,7 +205,11 @@
             call fixmultilayer(error)
           endif
         case('AGEB')
-           call fixmultilayer_tropomask(error)
+           if(jra55_data) then
+             call fixmultilayer_tropomask_temp(error)
+           else
+             call fixmultilayer_tropomask(error)
+           endif
            if (track_kill) then
               allocate(x_kill(numpart),y_kill(numpart),z_kill(numpart))
               allocate(it_kill(numpart),nstop_kill(numpart))
@@ -264,11 +266,6 @@
           xtra1(i) = modulo(xtra1(i), nearest(float(nx-1),-1.))
         enddo
       endif
-      
-! Allocate the 3D fields
-!***********************
-
-      call alloc_3D
 
 ! Calculate particle trajectories
 !********************************
@@ -290,7 +287,9 @@
 
       ! always
       if(merra_data) then
-      	call alloc_merra
+        call alloc_merra
+      else if (jra55_data) then
+        call alloc_jra55
       else
          print *,'alloc_3D uuh vvh tth uupol vvpol ps tt2 u10 v10'
          allocate (uupol(0:nx-1,0:ny-1,nuvz,2),vvpol(0:nx-1,0:ny-1,nuvz,2))
