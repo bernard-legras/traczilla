@@ -56,7 +56,7 @@ real function satratio(press,temp)
 !*******************************************************************************
 
  real, intent(in):: press, temp
- real estar, satppmv
+ real :: estar, satppmv
  ! saturation pressure
  estar=1.0008*exp(23.33086-(6111.72784/(temp))+0.15215*alog(temp))
  ! saturation in volume mixing ratio (ppmv)
@@ -106,15 +106,15 @@ real function satratio(press,temp)
 !     Variable Declarations.
 !
 
-      real p         ! Pressure (Pascal)
-      real t         ! Temperature (K)
-      real fespt
+      real,intent(in) :: p,t         ! Pressure (Pascal)
+                                     ! Temperature (K)
+      real :: fespt
       
-      real rd        ! Gas constant for dry air  (m**2/(s**2*K))
+      real :: rd        ! Gas constant for dry air  (m**2/(s**2*K))
       parameter( rd     = 287.0 )
-      real rv        ! Gas constant for water vapor  (m**2/(s**2*K)).
+      real :: rv        ! Gas constant for water vapor  (m**2/(s**2*K)).
       parameter( rv     = 461.0 )
-      real rddrv    
+      real :: rddrv    
       parameter( rddrv  = rd/rv )
 
 
@@ -123,9 +123,8 @@ real function satratio(press,temp)
       f_qvsat = rddrv * fespt / (p-(1.0-rddrv)*fespt)
 
       RETURN
+      END FUNCTION F_QVSAT
       
-      CONTAINS
-
       REAL FUNCTION F_ES( p, t ) 
 !#######################################################################
 !
@@ -148,9 +147,9 @@ real function satratio(press,temp)
 !#######################################################################
 !     Variable Declarations.
 
-      real p         ! Pressure (Pascal)
-      real t         ! Temperature (K)
-      real f_esl, f_esi
+      real, intent(in) :: p,t         ! Pressure (Pascal)
+                                      ! Temperature (K)
+      real :: f_esl, f_esi
 
 !      IF ( t.ge.273.15 ) THEN      ! for water
       IF ( t.ge.253.15 ) THEN      ! modification Petra Seibert
@@ -165,10 +164,9 @@ real function satratio(press,temp)
 
       REAL FUNCTION F_ESL( p, t )  
 
-      real p         ! Pressure (Pascal)
-      real t         ! Temperature (K)
-
-      real f
+      real, intent(in) :: p,t         ! Pressure (Pascal)
+                                      ! Temperature (K)
+      real :: f
 
 !#######################################################################
 !
@@ -178,23 +176,14 @@ real function satratio(press,temp)
 !
 !#######################################################################
 
-      real satfwa, satfwb
+      real :: satfwa, satfwb
       parameter ( satfwa = 1.0007 )
       parameter ( satfwb = 3.46e-8 )  ! for p in Pa
 
-      real satewa, satewb, satewc
+      real :: satewa, satewb, satewc
       parameter ( satewa = 611.21 )   ! es in Pa
       parameter ( satewb = 17.502 )
       parameter ( satewc = 32.18 )
-
-      real satfia, satfib
-      parameter ( satfia = 1.0003 )
-      parameter ( satfib = 4.18e-8 )  ! for p in Pa
-
-      real sateia, sateib, sateic
-      parameter ( sateia = 611.15 )   ! es in Pa
-      parameter ( sateib = 22.452 )
-      parameter ( sateic = 0.6 )
 
       f = satfwa + satfwb * p
       f_esl = f * satewa * exp( satewb*(t-273.15)/(t-satewc) )
@@ -204,9 +193,9 @@ real function satratio(press,temp)
 
       REAL FUNCTION F_ESI( p, t )  
 
-      real p         ! Pressure (Pascal)
-      real t         ! Temperature (K)
-      real f
+      real, intent(in) :: p,t         ! Pressure (Pascal)
+                                      ! Temperature (K)
+      real :: f
 
 !#######################################################################
 !
@@ -216,20 +205,11 @@ real function satratio(press,temp)
 !
 !#######################################################################
 !
-      real satfwa, satfwb
-      parameter ( satfwa = 1.0007 )
-      parameter ( satfwb = 3.46e-8 )  ! for p in Pa
-
-      real satewa, satewb, satewc
-      parameter ( satewa = 611.21 )   ! es in Pa
-      parameter ( satewb = 17.502 )
-      parameter ( satewc = 32.18 )
-
-      real satfia, satfib
+      real :: satfia, satfib
       parameter ( satfia = 1.0003 )
       parameter ( satfib = 4.18e-8 )  ! for p in Pa
 
-      real sateia, sateib, sateic
+      real :: sateia, sateib, sateic
       parameter ( sateia = 611.15 )   ! es in Pa
       parameter ( sateib = 22.452 )
       parameter ( sateic = 0.6 )
@@ -239,8 +219,6 @@ real function satratio(press,temp)
 
       RETURN
       END FUNCTION F_ESI
-      
-      END FUNCTION F_QVSAT
 
 !===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ EW @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -252,7 +230,7 @@ real function satratio(press,temp)
 !     NACH DER GOFF-GRATCH-FORMEL.
 !     ****************************************************************
       REAL, INTENT(IN)::X
-      REAL Y,A,C,D
+      REAL :: Y,A,C,D
       EW=0.
       IF(X.LE.0.) STOP 'SORRY: T NOT IN [K]'
       Y=373.16/X
