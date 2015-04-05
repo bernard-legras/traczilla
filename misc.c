@@ -1,11 +1,9 @@
 #include "ieeeftn.h"
 
 #if STDC
-LOGICAL
-isinf(REAL *x)
+LOGICAL isinf(REAL *x)
 #else /* NOT STDC */
-LOGICAL
-isinf(x)
+LOGICAL isinf(x)
 REAL *x;
 #endif /* STDC */
 {
