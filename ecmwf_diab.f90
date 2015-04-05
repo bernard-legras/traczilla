@@ -35,9 +35,8 @@ module ecmwf_diab
 use commons
 use isentrop_m
 implicit none
-save
 
-logical ecmwf_diabatic_w
+logical, save :: ecmwf_diabatic_w
 
 ! other variables now declared in commons which are also
 ! used by merra
@@ -79,8 +78,8 @@ logical ecmwf_diabatic_w
 ! path_diab               paths for diabatic directory and associated AVAILABLE file
 ! len_diab                lengths of the two previous strings
 
-real, allocatable :: area_coefft(:),pmc(:),pif(:)
-integer :: NPureP
+real(dp), save, allocatable :: area_coefft(:),pmc(:),pif(:)
+integer, save :: NPureP
 
 ! coefficients for the correction of the mass conservation across pressure surfaces
 
@@ -144,8 +143,8 @@ end subroutine alloc_ecmwf_diab
 !                                                                            *
 !*******************************************************************************
 
-      integer indj,indmin,itime,nstop,memaux
-      save indmin
+      integer :: indj,indmin,itime,nstop,memaux
+      save :: indmin
 
       data indmin/1/
  
@@ -276,7 +275,7 @@ end subroutine alloc_ecmwf_diab
 !**********************************************************************
 
       integer, intent(in):: indj,n
-      integer i,j,k,levdiff2,ifield,iumax,iwmax,lunit
+      integer :: i,j,k,levdiff2,ifield,iumax,iwmax,lunit
 
 ! VARIABLES AND ARRAYS NEEDED FOR GRIB DECODING
 
@@ -286,16 +285,16 @@ end subroutine alloc_ecmwf_diab
 ! dimension of zsec2 at least (10+nn), where nn is the number of vertical
 ! coordinate parameters
 
-      integer isec0(2),isec1(56),isec3(2)
-      integer isec4(64),ilen,ierr,iword
-      integer count100, count101, count102, count103, count110
+      integer :: isec0(2),isec1(56),isec3(2)
+      integer :: isec4(64),ilen,ierr,iword
+      integer :: count100, count101, count102, count103, count110
       integer, allocatable :: inbuff(:), isec2(:)
-      real zsec3(2)
-      real, allocatable :: zsec4(:), zsec2(:)
-      real xaux,yaux,xaux0,yaux0
+      real(dp) :: zsec3(2)
+      real(dp), allocatable :: zsec4(:), zsec2(:)
+      real(dp) :: xaux,yaux,xaux0,yaux0
 
       character(len=1):: yoper
-      logical hflswitch,strswitch
+      logical :: hflswitch,strswitch
 
       data yoper/'D'/
 
@@ -350,14 +349,14 @@ end subroutine alloc_ecmwf_diab
         if(isec2(3).ne.ny) stop 'READ_DIAB: NY NOT CONSISTENT'
         if(isec2(12)/2-1.ne.nlev_ec) &
           stop 'READ_DIAB: VERTICAL DISCRETIZATION NOT CONSISTENT'
-        xaux=float(isec2(5))/1000.
-        yaux=float(isec2(7))/1000.
+        xaux=float(isec2(5))/1000._dp
+        yaux=float(isec2(7))/1000._dp
         xaux0=xlon0
         yaux0=ylat0
-        if(xaux<0.) xaux=xaux+360.
-        if(yaux<0.) yaux=yaux+360.
-        if(xaux0<0.) xaux0=xaux0+360.
-        if(yaux0<0.) yaux0=yaux0+360.
+        if(xaux<0.) xaux=xaux+360._dp
+        if(yaux<0.) yaux=yaux+360._dp
+        if(xaux0<0.) xaux0=xaux0+360._dp
+        if(yaux0<0.) yaux0=yaux0+360._dp
         if(abs(xaux-xaux0)>1.e-3) then
           print *, xaux, xaux0
           stop 'READ_DIAB: LOWER LEFT LONGITUDE NOT CONSISTENT'
@@ -506,7 +505,7 @@ end subroutine alloc_ecmwf_diab
 !                                                                              *
 !*******************************************************************************
 
-      integer i
+      integer :: i
       logical, intent(out)::error
 
       character(len=*), intent(in):: pathfile
@@ -584,11 +583,11 @@ end subroutine alloc_ecmwf_diab
 !*******************************************************************************
 
       use date
-      logical error, toobig
-      integer i,j,idiff,ldat,ltim
-      integer year,month,day
-      double precision jul,beg,end
-      character(len=10):: fname,spec
+      logical :: error, toobig
+      integer :: i,j,idiff,ldat,ltim
+      integer :: year,month,day
+      real(dbl) :: jul,beg,end
+      character(len=16):: fname,spec
       character(len=16), allocatable:: wfname1(:),wfspec1(:)
       integer, allocatable:: wftime1(:)
 
@@ -603,11 +602,11 @@ end subroutine alloc_ecmwf_diab
 
       if (ideltas.gt.0) then         ! forward trajectories
         beg=bdate-1.                 ! idiffmax should be used here too               
-        end=bdate+dble(float(ideltas)/86400.) &
-                 +dble(float(idiffmax)/86400.)
+        end=bdate+dble(float(ideltas)/86400._dp) &
+                 +dble(float(idiffmax)/86400._dp)
       else                           ! backward trajectories
-        beg=bdate+dble(float(ideltas)/86400.) &
-                 -dble(float(idiffmax)/86400.)
+        beg=bdate+dble(float(ideltas)/86400._dp) &
+                 -dble(float(idiffmax)/86400._dp)
         end=bdate+1.                 ! idiffmax shoukd be used here too
       endif
 
@@ -622,7 +621,7 @@ end subroutine alloc_ecmwf_diab
       enddo
       
       numbwf_diab=0
-100   read(unitavailab,'(i8,1x,i6,2(6x,a10))',end=99) &
+100   read(unitavailab,'(i8,1x,i6,3x,a16,3x,a10)',end=99) &
            ldat,ltim,fname,spec
       jul=juldate(ldat,ltim)
       if ((jul.ge.beg).and.(jul.le.end)) then
@@ -639,9 +638,9 @@ end subroutine alloc_ecmwf_diab
 !  offset time by +1h30 as indicated in AVAILABLE takes 
 !  into account the fact that temperature
 !  tendencies are accumulated over a time interval of 3h
-        wfname1(numbwf_diab)=fname
-        wfspec1(numbwf_diab)=spec
-        wftime1(numbwf_diab)=nint((jul-bdate)*86400.)
+        wfname1(numbwf_diab)=adjustl(fname)
+        wfspec1(numbwf_diab)=trim(spec)
+        wftime1(numbwf_diab)=nint((jul-bdate)*86400._dp)
       endif
       goto 100       ! next wind field
 
@@ -698,8 +697,8 @@ end subroutine alloc_ecmwf_diab
 !         getfield
           if(perpetual) then
             ! check done on unshifted times to process several bissextil years
-            if(ideltas > 0) call caldate(wftime1(i-1)/86400.+bdate,ldat,ltim)
-            if(ideltas < 0) call caldate(wftime1(i  )/86400.+bdate,ldat,ltim)
+            if(ideltas > 0) call caldate(wftime1(i-1)/86400._dp+bdate,ldat,ltim)
+            if(ideltas < 0) call caldate(wftime1(i  )/86400._dp+bdate,ldat,ltim)
             year=int(ldat/10000)
             month=int((ldat-10000*year)/100)
             day=int(ldat-10000*year-100*month)
@@ -785,8 +784,8 @@ end subroutine alloc_ecmwf_diab
 !                                                                              *
 !*******************************************************************************
   integer, intent(in) :: n,m
-  integer ix, jy, iz
-  real pp
+  integer :: ix, jy, iz
+  real(dp) :: pp
 
 ! Loop over the whole grid
 !*************************
@@ -795,7 +794,7 @@ end subroutine alloc_ecmwf_diab
     do ix=0,nx-1
       do iz=2, nuvz
         pp=akz(iz)+bkz(iz)*(ps(ix,jy,1,1)+(ps(ix,jy,1,2)))/2
-        w_diab(ix,jy,iz,n)=w_diab(ix,jy,iz,n)*((p0/pp)**kappa)/10800.
+        w_diab(ix,jy,iz,n)=w_diab(ix,jy,iz,n)*((p0/pp)**kappa)/10800._dp
       enddo
     enddo
   enddo
@@ -834,9 +833,9 @@ end subroutine alloc_ecmwf_diab
 !*******************************************************************************
 
   integer, intent(in) :: n,m
-  real, allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:), flux_lat(:)
-  real, allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:)
-  real, allocatable :: mean_w(:)
+  real(dp), allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:), flux_lat(:)
+  real(dp), allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:)
+  real(dp), allocatable :: mean_w(:)
   integer :: k
 
   allocate(theta(0:nx-1,0:ny-1,nuvz))
@@ -960,7 +959,6 @@ end subroutine alloc_ecmwf_diab
   return
   end subroutine diab_mass_init
 
-
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
@@ -1003,18 +1001,18 @@ subroutine interpol_wind_theta_diab   &
 
       integer, intent(in) :: itime,ngrid
       integer, intent(inout):: nstop
-      real, intent(in) :: xt,yt,ztheta
-      real, intent(out) :: dxdt,dydt,dzdt,z_factor,tint, theta_inf, theta_sup
+      real(dp), intent(in) :: xt,yt,ztheta
+      real(dp), intent(out) :: dxdt,dydt,dzdt,z_factor,tint, theta_inf, theta_sup
 
 ! Auxiliary variables needed for interpolation
-      real theta
-      real u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2)
-      real dt1_diab,dt2_diab,dtt_diab
-      real tr(4,2),trp(4,2),u(4,2),v(4,2),w(4,2),tp(4,2)
-      integer m,indexh,indz(4,2)
-      integer ix,jy,ixp,jyp,i0,j0,idxy
-      real ddx,ddy,rddx,rddy,p1,p2,p3,p4
-      real psl0,psup0,pinf0,pisup0,piinf0
+      real(dp) :: theta
+      real(dp) :: u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2)
+      real(dp) :: dt1_diab,dt2_diab,dtt_diab
+      real(dp) :: tr(4,2),trp(4,2),u(4,2),v(4,2),w(4,2),tp(4,2)
+      integer :: m,indexh,indexh_diab,indz(4,2)
+      integer :: ix,jy,ixp,jyp,i0,j0,idxy
+      real(dp) :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
+      real(dp) :: psl0,psup0,pinf0,pisup0,piinf0
 
 !********************************************
 ! Multilinear interpolation in time and space
@@ -1035,12 +1033,18 @@ subroutine interpol_wind_theta_diab   &
 ! Calculate coefficients for temporal interpolation
 !**************************************************
 
+      ! note that dt1 and dt2 are negative in backward time but the product 
+      ! with dtt which is also negative is positive and provides the right weight
       dt1=float(itime-memtime(1))
       dt2=float(memtime(2)-itime)
       dtt=1./(dt1+dt2)
+      dt1=dt1*dtt
+      dt2=dt2*dtt
       dt1_diab=float(itime-memtime_diab(1))
       dt2_diab=float(memtime_diab(2)-itime)
       dtt_diab=1./(dt1_diab+dt2_diab)
+      dt1_diab=dt1_diab*dtt_diab
+      dt2_diab=dt2_diab*dtt_diab
  
       !if (debug_out) print *,p1,p2,p3,p4
       !if (debug_out) print *,dt1,dt2,dt1_diab,dt2_diab
@@ -1117,8 +1121,8 @@ subroutine interpol_wind_theta_diab   &
                    + (theta_g(lower_theta_level,ix,jy,memind(2))*p1 &
                     + theta_g(lower_theta_level,ix,jyp,memind(2))*p2 &
                     + theta_g(lower_theta_level,ixp,jy,memind(2))*p3 &
-                    + theta_g(lower_theta_level,ixp,jyp,memind(2))*p4)*dt2) &
-                   * dtt
+                    + theta_g(lower_theta_level,ixp,jyp,memind(2))*p4)*dt2)
+                
         theta_sup = ((theta_g(upper_theta_level,ix,jy,memind(1))*p1 &
                     + theta_g(upper_theta_level,ix,jyp,memind(1))*p2 &
                     + theta_g(upper_theta_level,ixp,jy,memind(1))*p3 &
@@ -1126,9 +1130,8 @@ subroutine interpol_wind_theta_diab   &
                    + (theta_g(upper_theta_level,ix,jy,memind(2))*p1 &
                     + theta_g(upper_theta_level,ix,jyp,memind(2))*p2 &
                     + theta_g(upper_theta_level,ixp,jy,memind(2))*p3 &
-                    + theta_g(upper_theta_level,ixp,jyp,memind(2))*p4)*dt2) &
-                   * dtt
-       
+                    + theta_g(upper_theta_level,ixp,jyp,memind(2))*p4)*dt2)
+                         
       endif
 
 ! Halt trajectories which are too close from lower boundary
@@ -1169,15 +1172,16 @@ subroutine interpol_wind_theta_diab   &
       case('log')
         do m=1,2
           indexh=memind(m)
-            
+          indexh_diab=memind_diab(m)
+                     
             u(1,m)=(uupol(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + uupol(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
             v(1,m)=(vvpol(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + vvpol(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(log(theta)-log(trp(1,m))) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
             u(2,m)=(uupol(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + uupol(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
@@ -1185,8 +1189,8 @@ subroutine interpol_wind_theta_diab   &
             v(2,m)=(vvpol(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + vvpol(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
-            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(log(theta)-log(trp(2,m))) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
             u(3,m)=(uupol(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + uupol(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
@@ -1194,8 +1198,8 @@ subroutine interpol_wind_theta_diab   &
             v(3,m)=(vvpol(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + vvpol(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(log(theta)-log(trp(3,m))) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
             u(4,m)=(uupol(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + uupol(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
@@ -1203,8 +1207,8 @@ subroutine interpol_wind_theta_diab   &
             v(4,m)=(vvpol(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + vvpol(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(log(theta)-log(trp(4,m))) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1217,6 +1221,7 @@ subroutine interpol_wind_theta_diab   &
       
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
             
             u(1,m)=(uupol(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
                   + uupol(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
@@ -1224,8 +1229,8 @@ subroutine interpol_wind_theta_diab   &
             v(1,m)=(vvpol(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
                   + vvpol(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
                   / (tr(1,m)-trp(1,m))
-            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m))  &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta))  &
+            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(theta-trp(1,m))  &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(tr(1,m)-theta))  &
                   / (tr(1,m)-trp(1,m))
             u(2,m)=(uupol(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
                   + uupol(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
@@ -1233,8 +1238,8 @@ subroutine interpol_wind_theta_diab   &
             v(2,m)=(vvpol(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
                   + vvpol(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
                   / (tr(2,m)-trp(2,m))
-            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m))  &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta))  &
+            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(theta-trp(2,m))  &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(tr(2,m)-theta))  &
                   / (tr(2,m)-trp(2,m))
             u(3,m)=(uupol(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
                   + uupol(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
@@ -1242,8 +1247,8 @@ subroutine interpol_wind_theta_diab   &
             v(3,m)=(vvpol(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
                   + vvpol(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
                   / (tr(3,m)-trp(3,m))
-            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m))  &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta))  &
+            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(theta-trp(3,m))  &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(tr(3,m)-theta))  &
                   / (tr(3,m)-trp(3,m))
             u(4,m)=(uupol(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
                   + uupol(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
@@ -1251,8 +1256,8 @@ subroutine interpol_wind_theta_diab   &
             v(4,m)=(vvpol(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
                   + vvpol(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
                   / (tr(4,m)-trp(4,m))
-            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m))  &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta))  &
+            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(theta-trp(4,m))  &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(tr(4,m)-theta))  &
                   / (tr(4,m)-trp(4,m))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1270,6 +1275,7 @@ subroutine interpol_wind_theta_diab   &
       case('log')      
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
 
             u(1,m)=(uuh(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) & 
                   + uuh(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
@@ -1277,8 +1283,8 @@ subroutine interpol_wind_theta_diab   &
             v(1,m)=(vvh(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
                   + vvh(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
-            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(log(theta)-log(trp(1,m))) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(log(tr(1,m))-log(theta))) &
+            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(log(theta)-log(trp(1,m))) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(log(tr(1,m))-log(theta))) &
                   / (log(tr(1,m))-log(trp(1,m)))
             u(2,m)=(uuh(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + uuh(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
@@ -1286,8 +1292,8 @@ subroutine interpol_wind_theta_diab   &
             v(2,m)=(vvh(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
                   + vvh(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
-            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(log(theta)-log(trp(2,m))) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(log(tr(2,m))-log(theta))) &
+            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(log(theta)-log(trp(2,m))) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(log(tr(2,m))-log(theta))) &
                   / (log(tr(2,m))-log(trp(2,m)))
             u(3,m)=(uuh(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + uuh(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
@@ -1295,8 +1301,8 @@ subroutine interpol_wind_theta_diab   &
             v(3,m)=(vvh(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
                   + vvh(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
-            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(log(theta)-log(trp(3,m))) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(log(tr(3,m))-log(theta))) &
+            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(log(theta)-log(trp(3,m))) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(log(tr(3,m))-log(theta))) &
                   / (log(tr(3,m))-log(trp(3,m)))
             u(4,m)=(uuh(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + uuh(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
@@ -1304,8 +1310,8 @@ subroutine interpol_wind_theta_diab   &
             v(4,m)=(vvh(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
                   + vvh(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
-            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(log(theta)-log(trp(4,m))) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(log(tr(4,m))-log(theta))) &
+            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(log(theta)-log(trp(4,m))) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(log(tr(4,m))-log(theta))) &
                   / (log(tr(4,m))-log(trp(4,m)))
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1318,6 +1324,7 @@ subroutine interpol_wind_theta_diab   &
       
         do m=1,2
           indexh=memind(m)
+          indexh_diab=memind_diab(m)
 
             u(1,m)=(uuh(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
                   + uuh(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
@@ -1325,8 +1332,8 @@ subroutine interpol_wind_theta_diab   &
             v(1,m)=(vvh(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
                   + vvh(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
                   / (tr(1,m)-trp(1,m))
-            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh)*(theta-trp(1,m)) &
-                  + w_diab(ix ,jy ,indz(1,m)+1,indexh)*(tr(1,m)-theta)) &
+            w(1,m)=(w_diab(ix ,jy ,indz(1,m)  ,indexh_diab)*(theta-trp(1,m)) &
+                  + w_diab(ix ,jy ,indz(1,m)+1,indexh_diab)*(tr(1,m)-theta)) &
                   / (tr(1,m)-trp(1,m))  
             u(2,m)=(uuh(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
                   + uuh(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
@@ -1334,8 +1341,8 @@ subroutine interpol_wind_theta_diab   &
             v(2,m)=(vvh(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
                   + vvh(ixp,jy ,indz(2,m)+1,indexh )*(tr(2,m)-theta)) &
                   / (tr(2,m)-trp(2,m))
-            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh)*(theta-trp(2,m)) &
-                  + w_diab(ixp,jy ,indz(2,m)+1,indexh)*(tr(2,m)-theta)) &
+            w(2,m)=(w_diab(ixp,jy ,indz(2,m)  ,indexh_diab)*(theta-trp(2,m)) &
+                  + w_diab(ixp,jy ,indz(2,m)+1,indexh_diab)*(tr(2,m)-theta)) &
                   / (tr(2,m)-trp(2,m))
             u(3,m)=(uuh(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
                   + uuh(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
@@ -1343,8 +1350,8 @@ subroutine interpol_wind_theta_diab   &
             v(3,m)=(vvh(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
                   + vvh(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
                   / (tr(3,m)-trp(3,m))
-            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh)*(theta-trp(3,m)) &
-                  + w_diab(ix ,jyp,indz(3,m)+1,indexh)*(tr(3,m)-theta)) &
+            w(3,m)=(w_diab(ix ,jyp,indz(3,m)  ,indexh_diab)*(theta-trp(3,m)) &
+                  + w_diab(ix ,jyp,indz(3,m)+1,indexh_diab)*(tr(3,m)-theta)) &
                   / (tr(3,m)-trp(3,m))
             u(4,m)=(uuh(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
                   + uuh(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
@@ -1352,8 +1359,8 @@ subroutine interpol_wind_theta_diab   &
             v(4,m)=(vvh(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
                   + vvh(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
                   / (tr(4,m)-trp(4,m))
-            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh)*(theta-trp(4,m)) &
-                  + w_diab(ixp,jyp,indz(4,m)+1,indexh)*(tr(4,m)-theta)) &
+            w(4,m)=(w_diab(ixp,jyp,indz(4,m)  ,indexh_diab)*(theta-trp(4,m)) &
+                  + w_diab(ixp,jyp,indz(4,m)+1,indexh_diab)*(tr(4,m)-theta)) &
                   / (tr(4,m)-trp(4,m))
 
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
@@ -1445,10 +1452,10 @@ subroutine interpol_wind_theta_diab   &
 ! 3.) Temporal interpolation (linear)
 !************************************
 
-      dxdt=(u1(1)*dt2+u1(2)*dt1)*dtt
-      dydt=(v1(1)*dt2+v1(2)*dt1)*dtt
-      dzdt=(w1(1)*dt2_diab+w1(2)*dt1_diab)*dtt_diab
-      if(AccurateTemp) tint=(tp1(1)*dt2+tp1(2)*dt1)*dtt
+      dxdt=u1(1)*dt2+u1(2)*dt1
+      dydt=v1(1)*dt2+v1(2)*dt1
+      dzdt=w1(1)*dt2_diab+w1(2)*dt1_diab
+      if(AccurateTemp) tint=tp1(1)*dt2+tp1(2)*dt1
       !if(debug_out) &
       ! print "('interpol>',i3,' P ',3f7.0,' T ',3f7.2,' TH ',3f7.2)", & ! test
       !   indz(1,1),p0*(theta/tint)**(-1/kappa),&
