@@ -35,6 +35,7 @@ use ecmwf_diab
 use ecmwf_inct
 use mass_iso
 use merra
+use jra55
 use combin
 use io
 use demar
@@ -149,20 +150,29 @@ contains
 !        print *,minval(shuffle),maxval(shuffle)
       endif
       
+      !print *,'jra logical variables ',jra55_data,jra55_diab
+      
       if (TTLactiv.or.CLAUSactiv) then
 ! Allocate arrays for temperature and saturation mixing ratio
         print *,'timemanager> allocate ttra1 and qtra1'
-        if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
-        if (.not.allocated(qtra1)) allocate (qtra1(maxpart))
-        print *,'allocated ttra1, qtra1'
+        if (.not.allocated(ttra1)) then
+          allocate(ttra1(maxpart))
+          print *,'allocated ttra1'
+        endif       
+        if (.not.allocated(qtra1)) then 
+          allocate (qtra1(maxpart))
+          print *,'allocated qtra1'
+        endif
 ! mixing ratio read if restart but here it is reinitalized
 ! mixing ratio initialized at the beginning, after each output or after restart
         qtra1=0.05_dp
       endif
 
-      if (AGEBactiv.or.AGEFactiv.or.merra_diab) then
-        if (.not.allocated(ttra1)) allocate(ttra1(maxpart))
-        print *,'allocated ttra1'
+      if (AGEBactiv.or.AGEFactiv.or.merra_diab.or.jra55_data) then
+        if (.not.allocated(ttra1)) then 
+          allocate(ttra1(maxpart))
+          print *,'allocated ttra1'
+        endif
       endif
       
       if(AGEBactiv) then
@@ -188,6 +198,9 @@ contains
  
       flush 6
 
+!***********************************************************************     
+!     T H E   T I M E    L O O P
+!
 !**********************************************************************
 ! Loop over the whole modelling period in time steps of mintime seconds
 !**********************************************************************
@@ -204,12 +217,13 @@ contains
 !       print *,'timemanager> itime, loutnext, npproc', itime, loutnext0, npproc 
 
 ! Get necessary wind fields if not available
-!*******************************************
-
+!===========================================
         if(iso_mass) then
           call getfields_iso(itime,nerr)
         else if (merra_data) then     
           call getfields_merra(itime,nerr)
+        else if (jra55_data) then
+          call getfields_jra55(itime,nerr)
         else
           call getfields(itime,nerr)
         endif
@@ -253,8 +267,9 @@ contains
             qtra1=0.05
           endif
         endif
-        if(itime==itime0 .and. TTLactiv) then
+        if(itime==itime0 .and. TTLactiv .and. .not.JRA55_data) then
            ! fake time step in order to calculate the temperature
+           print *,'fake initial step to calculate T'
            do j=1,numpart
              call advanceB(j,itime,0.,nstop,xtra1(j),ytra1(j),ztra1(j),ttra1(j))
            enddo
@@ -270,13 +285,16 @@ contains
             write(yyyy,'(I4)') ytr
             if (merra_data) then
                tropofile=trim(tropodir)//'tropo-theta-MERRA-'//yyyy//'.bin'
+            else if (jra55_data) then
+               tropofile=trim(tropodir)//'tropo-theta-JRA-'//yyyy//'.bin'
             else
-               tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'
+               tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'          
             endif
             open(tropunit,file=tropofile,access='direct',status='old', &
               recl=4*ny*nx)
             print *,'opening tropopause file for ',yyyy
             tropoyy=ytr
+            tropopen=.true.
           endif 
           mtr=floor(yyyymmdd/100._dp-100*ytr+epsil)
           dtr=yyyymmdd-10000*ytr-100*mtr
@@ -290,7 +308,7 @@ contains
           if (tropotest) then
             read(tropunit,rec=dyr)buff
             tropozdd=reshape(buff,(/nx,ny/))
-            write(*,'(" tropotest ",I4,2I2.2,I5)') ,ytr,mtr,dtr,dyr
+            write(*,'(" tropotest ",I4,2I2.2,I5)') ytr,mtr,dtr,dyr
           endif
         else
           tropotest=.false.
@@ -328,6 +346,7 @@ contains
           call savsav(itime)
           if (track_kill)  call savkill(itime)
           if (track_cross) call savcross(itime)
+          flush (6)
         endif                           
  
 ! Calculate Lyapunov exponents: TO BE UPDATED WITH I. PISSO CODE
@@ -396,7 +415,7 @@ contains
          !endif
 
 ! If integration step is due, do it
-!**********************************
+!==================================
           ifdue: if ((abs(itime+lsynctime)> abs(itra1(j))) .and. &
               (abs(itra1(j))>= abs(itime))) then
             if(itra1(j) == itime) then
@@ -406,8 +425,8 @@ contains
             endif
 
 ! Integrate advection equation for lsynctime seconds
-!***************************************************
-            if (merra_diab) tint=ttra1(j)
+!===================================================
+            if (merra_diab.or.jra55_data) tint=ttra1(j)
 !           if(debug_out) &
 !              print "(' timemanager> particle ',i6,2X,3G12.5)",&
 !                 j,xtra1(j),ytra1(j),ztra1(j)
@@ -421,14 +440,16 @@ contains
 !------------------------------------
 
 ! Apply tropopause test when due to discard parcels having crossed
-!*****************************************************************
+!=================================================================
 ! Apply simultaneously the duration test to discard parcels beyond maximum life
-!****************************************************************************** 
+!============================================================================== 
 ! It is assumed that the tropopause data have same grid as the wind
 ! Management of the date is done locally without the weight of 
 ! the available/getfields mech
 ! This test has priority over those performed in advanceB
-            
+ 
+! This test is inexact at the pole but who cares?
+           
             if (tropotest) then
               ix=floor(xtra1(j))
               jy=min(ny-2,max(0,floor(ytra1(j))))
@@ -453,17 +474,18 @@ contains
             endif
 
 ! Calculate qv for final pressure and initial temperature
-!********************************************************
+! Copy tint in ttra1
+!========================================================
             if(TTLactiv) then
               ttra1(j)=tint
               qtra1(j)=min(qtra1(j),satratio(p0*exp(-ztra1(j)),tint))
-            else if (AGEBactiv.or.AGEFactiv.or.merra_diab) then
+            else if (AGEBactiv.or.AGEFactiv.or.merra_diab.or.jra55_data) then
               ttra1(j)=tint
             endif
            
 ! Determine, when next time step is due
 ! If trajectory is terminated, do not increment its time
-!*******************************************************
+!=======================================================
 
             if (nstop>1) then           
               npstop_thread(nstop)=npstop_thread(nstop)+1                                
@@ -583,9 +605,9 @@ contains
       
       integer, intent(in):: jp,itime
       integer, intent(out):: nstop
-      real, intent(in) :: dt
-      real, intent(inout):: x,y,z
-      real, intent(inout):: tint
+      real(dp), intent(in) :: dt
+      real(dp), intent(inout):: x,y,z
+      real(dp), intent(inout):: tint
 
 !      integer i,j,k,nrand,loop
 !      integer memindnext,ixnext,jynext     
@@ -594,11 +616,11 @@ contains
 !      integer ix,jy,ixp,jyp
 
       integer :: ngrid, idummy
-      real :: wdiff
-      real :: xlon,ylat,xpol,ypol,gridsize
-      real :: cosfact,psaver,theta_inf,theta_sup
-      real :: u,v,w,dxsave,dysave,z_factor,rand_angle
-      real, dimension(nss) :: harvest
+      real(dp) :: wdiff
+      real(dp) :: xlon,ylat,xpol,ypol,gridsize
+      real(dp) :: cosfact,psaver,theta_inf,theta_sup
+      real(dp) :: u,v,w,dxsave,dysave,z_factor,rand_angle
+      real(dp), dimension(nss) :: harvest
       save idummy
 
       data idummy/-7/
@@ -610,7 +632,7 @@ contains
 ! Determine whether lat/long grid or polarstereographic projection
 ! is to be used
 ! Furthermore, determine which nesting level to be used
-!*****************************************************************
+!=================================================================
 
       if (nglobal.and.(y.gt.switchnorthg)) then
         ngrid=-1
@@ -621,7 +643,7 @@ contains
       endif
 
 ! Interpolate the wind
-!*********************
+!=====================
 
 !      if (debug_out) print *,'advanceB call interpol'
       if(isentropic_motion) then
@@ -643,7 +665,10 @@ contains
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
         !if(debug_out) print *,'abvanceB (x,y,z)> ',x,y,z
         !if(debug_out) print *,'lat lon        > ',y*dy+ylat0,x*dx+xlon0
-        !if(debug_out) print *,'(u,v,w,tint)    > ',u,v,w*86400,tint 
+        !if(debug_out) print *,'(u,v,w,tint)    > ',u,v,w*86400,tint
+      elseif (jra55_data) then
+        call interpol_wind_jra55(itime,x,y,z,u,v,w,ngrid, &
+           theta_inf,theta_sup,psaver,z_factor,tint,nstop)       
       elseif (z_motion) then
         call interpol_windB(itime,x,y,z,u,v,w,ngrid, &
            psaver,z_factor,tint)
@@ -658,24 +683,25 @@ contains
 ! Compute everything for above the PBL
 
 ! Calculate horizontal displacement (in m)
-!*******************************************
+!=========================================
       dxsave=u*dt*float(ldirect)   
       dysave=v*dt*float(ldirect)
       
 ! Calculate vertical position at time step itime+lsynctime
-!*********************************************************
+!==========================================================
 !     kinematic trajectories with w in Pa/s
       if(z_motion) z=z-w*dt*float(ldirect)/(p0*exp(-z))
-      if(z_motion.and.debug_out) then
-        print*,p0*exp(-z),w*dt,z,psaver
-      endif
+      !if(z_motion.and.debug_out) then
+      !  print*,p0*exp(-z),w*dt,z,psaver
+      !endif
 !     diabatic trajectories with w in K/s
-      if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data)) z=z+w*dt*float(ldirect)
+      if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data.or.jra55_data)) &
+         z=z+w*dt*float(ldirect)
       if(iso_mass .and. mass_diabat)  z=z+w*dt*float(ldirect)
 
-!****************************************************************
+
 ! Add random vertical/horizontal component to the displacement
-!****************************************************************
+!=============================================================
        
       if((nsample(1) > 1).and.(.not.switch_diff_off)) then
         call random_number(harvest)
@@ -690,25 +716,23 @@ contains
         endif
       endif    
       
-!****************************************************************
 ! Projects onto the frontier if going above or below
-!****************************************************************
-
+!====================================================
       if (z_motion) then 
          z=min(z,zmax)
          if (z.lt.log(p0/psaver)) z=2*log(p0/psaver)-z ! bouncing
       endif
       if (theta_bounds) then
-         if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab)) &
+         if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab.or.jra55_diab)) &
             z=max(min(z,theta_sup),theta_inf)
          if (mass_diabat) &
             z=max(min(z,ThetaLev(NbTheta)),ThetaLev(1))
       endif
 !     if (debug_out) print *,'advanceB z sup inf ',z,theta_sup,theta_inf
       
-!*************************************************************
 ! Calculates new horizontal position in grid coordinates
-!*************************************************************
+!=======================================================
+! Manage polar regions
 
       if (ngrid.ge.0) then
         cosfact=dxconst/cos((y*dy+ylat0)*pih)
@@ -742,32 +766,18 @@ contains
 
 
 ! If global data are available, use cyclic boundary condition
-!************************************************************
+!------------------------------------------------------------
      
       if (xglobal) x = modulo(x,nearest(float(nx-1),-1.))
-
-!*****************************************************************
+      
 ! Check position: If trajectory outside model domain, terminate it
 ! (should not happen)
-!*****************************************************************
+!=================================================================
 
 !     nstop must be less or equal to 7 or change bound in timemanager
 
-      if(.not.merra_data) then
-	      if ((x.lt.0.).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.0.).or. &
-	       (y.gt.float(ny-1)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
-	        nstop=3
-	        print *, 'stop parcel:trajectory terminated ',jp, ngrid
-	        if (ngrid.ge.0) then
-	          write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
-!            print *,y-dysave*dyconst*float(ldirect),switchnorthg
-	        else
-	          write(*,'(6g14.5)') xlon,ylat,dxsave,dysave,xpol,ypol
-	        endif
-!          write (*,'(a,3g12.3)')'stopped trajectory ',x,y,z
-	      endif
-      else
-         if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
+      if(merra_data) then
+          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
 	       (y.gt.nearest(float(ny)-0.5,1.)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
 	        nstop=3
 	        print *, 'stop parcel:trajectory terminated ',jp, ngrid
@@ -777,6 +787,31 @@ contains
 	          write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
 	        endif
 	      endif
+	  else if (jra55_data)  then
+	      ! (90-ylat0)/dy=0.7675033...     1-0.7675033...=0.23249669...
+	      if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.-0.767504).or. &
+	       (y.gt.float(ny)-0.232497).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
+	        nstop=3
+	        print *, 'stop parcel:trajectory terminated ',jp, ngrid
+	        if (ngrid.ge.0) then
+	          write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
+	        else
+	          write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
+	        endif
+	      endif
+      else
+          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.0.).or. &
+            (y.gt.float(ny-1)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
+            nstop=3
+            print *, 'stop parcel:trajectory terminated ',jp, ngrid
+            if (ngrid.ge.0) then
+              write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
+!             print *,y-dysave*dyconst*float(ldirect),switchnorthg
+            else
+              write(*,'(6g14.5)') xlon,ylat,dxsave,dysave,xpol,ypol
+            endif
+!          write (*,'(a,3g12.3)')'stopped trajectory ',x,y,z
+          endif
       endif
 
 !     if (debug_out) print *,'abvanceB (x,y,z)> ',x,y,z
