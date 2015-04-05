@@ -72,16 +72,16 @@ subroutine interpol_wind_theta   &
 !*******************************************************************************
 
       integer, intent(in) :: itime,ngrid
-      real, intent(in) :: xt,yt,theta
-      real, intent(out) :: dxdt,dydt,z_factor,tint, theta_inf, theta_sup
+      real(dp), intent(in) :: xt,yt,theta
+      real(dp), intent(out) :: dxdt,dydt,z_factor,tint, theta_inf, theta_sup
 
 ! Auxiliary variables needed for interpolation
-      real u1(2),v1(2),dt1,dt2,dtt,tp1(2)
-      real tr(4,2),trp(4,2),u(4,2),v(4,2),tp(4,2)
-      integer m,indexh,indz(4,2)
-      integer ix,jy,ixp,jyp,i0,j0,idxy
-      real ddx,ddy,rddx,rddy,p1,p2,p3,p4
-      real psl0,psup0,pinf0,pisup0,piinf0
+      real(dp) :: u1(2),v1(2),dt1,dt2,dtt,tp1(2)
+      real(dp) :: tr(4,2),trp(4,2),u(4,2),v(4,2),tp(4,2)
+      integer :: m,indexh,indz(4,2)
+      integer :: ix,jy,ixp,jyp,i0,j0,idxy
+      real(dp) :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
+      real(dp) :: psl0,psup0,pinf0,pisup0,piinf0
 
 !********************************************
 ! Multilinear interpolation in time and space
