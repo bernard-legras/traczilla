@@ -5,6 +5,7 @@
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
 TARGET=X64-par-ng
+#TARGET=win
 HOME=/home/legras
 
 SHELL = /bin/bash
@@ -45,24 +46,26 @@ endif
 ifeq ($(TARGET),X64-par-ng)
   MAIN = TRACZILLA-TT-par-ng
   CC = pgcc
-  CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
+  CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Msmartalloc
   # include needed for netcdf.mod
-  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -fastsse -Minfo -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -I$(HOME)/local-ng/include -Mbounds -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
   #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
-  LDFLAGS1 = -rpath $(HOME)/local-ng/lib -L$(HOME)/local-ng/lib -lgribex -lcom -lnetcdf -lnetcdff
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib -L$(HOME)/local-ng/lib -lgribex -lgrib_api -lgrib_api_f90 -lcom -lnetcdf -lnetcdff
 endif
 ifeq ($(TARGET),X64-ng)
   MAIN = TRACZILLA-TT-ng
   CC = pgcc
   CFLAGS = -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
-  FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  FFLAGS = -I$(HOME)/local/include -g -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
   LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
 endif
 ifeq ($(TARGET),win)
   MAIN = TRACZILLA-win
-  CC = gcc
+  CC = pgcc
   FC=gfortran
-  FFLAGS = -O2 -fopenmp -pedantic -std=f2003 -Wall -fconvert=swap -fall-intrinsics -fmax-errors=0
+  FFLAGS = -O2 -fopenmp -pedantic -std=f2003 -cpp -Wall -fconvert=swap -fall-intrinsics -fmax-errors=20 -I /opt/netcdf42/gfortran/include -I /usr/lib64/gfortran/modules
   CFLAGS = -O2 
   LDFLAGS1 =
 endif
@@ -76,14 +79,14 @@ endif
 	$(FC) $(FFLAGS) -c $<
 
 #
-OBJECTS0 = commons.mod date.mod coord.mod thermo.mod io.mod lyapunov.mod\
+OBJECTS0 = commons.mod date.mod coord.mod thermo.mod io.mod interpol.mod lyapunov.mod\
 isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterp.mod\
-sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod combin.mod \
-demar.mod advect.mod
+sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod jra55.mod combin.mod \
+demar.mod advect.mod 
 
 OBJECTS1 =  TRACZILLA.o
 
-OBJECTS2 = misc.o uvip3p.o random.o 
+OBJECTS2 = misc.o random.o 
 
 $(MAIN): $(OBJECTS0) $(OBJECTS1) $(OBJECTS2)
 	$(FC) *.o -o $(MAIN) $(FFLAGS) $(LDFLAGS1)
