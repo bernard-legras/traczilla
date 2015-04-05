@@ -27,6 +27,9 @@
 module demar
 use commons
 use date
+use isentrop_m
+use io
+use interpol
 implicit none
 
 ! variables local to this module
@@ -77,6 +80,7 @@ contains
  use ecmwf_inct
  use mass_iso
  use merra
+ use jra55
  
  character(len=72):: line
  logical error
@@ -91,7 +95,7 @@ contains
    loutsample,          & ! average is computed from samples taken every 
                           ! loutsample [s]
    itsplit,             & ! time constant for particle splitting [s]
-   loutsav ,			& ! time interval of saving full fields
+   loutsav ,            & ! time interval of saving full fields
    lsynctime,           & ! synchronisation time interval for all particles[s]
    loffset,             & ! offset time for the first output [s]
                           ! (allows to start at any time)
@@ -133,9 +137,11 @@ contains
    mass_diabat,         & ! use heating rates on isentropic levels
    mass_isent,          & ! isentropic motion from data on isentropic levels
    mass_correction,     & ! heating rate correction to preserve mass conservation in the stratosphere
-   mean_diab_output,    &  ! Output of the mass averaged heating rate
-   merra_data,          &  ! merra winds
-   merra_diab              ! merra heating rates 
+   mean_diab_output,    & ! Output of the mass averaged heating rate
+   merra_data,          & ! merra winds
+   merra_diab,          & ! merra heating rates
+   jra55_data,          & ! jra55 winds
+   jra55_diab             ! jra55 heating rates  
    
 !Open the command file and read user options
 !-------------------------------------------
@@ -293,7 +299,8 @@ contains
  print *,'readcommand > isentropic_motion ',isentropic_motion
  print *,'readcommand > diabatic_w ',diabatic_w
  print *,'readcommand > ecmwf_diabatic_w ',ecmwf_diabatic_w
- print *,'readcommand > merra _data n _diab ',merra_data,merra_diab
+ print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
+ print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
  print *,'readcommand > clear_sky ',clear_sky
  print *,'readcommand > cloud_sky ',cloud_sky
  print *,'readcommand > ecmwf_inct_w ',ecmwf_inct_w
@@ -567,7 +574,7 @@ contains
     uniform_spread,     & ! activate uniform spread
     uniform_mesh,       & ! activate the uniform mesh in longitude
     tropodir,           & ! directory where to find the tropopause files
-    track_kill,		    & ! track the killing of parcels
+    track_kill,         & ! track the killing of parcels
     track_cross,        & ! track the crossing of 1800K and 2300K surfaces
     shuffling             ! activate shuffling of parcels in timemanager
     
@@ -2057,6 +2064,8 @@ end subroutine readreleasesB2
  !  if ((ypoint1(k) < 0.).or.(ypoint1(k) > ny+epsil2)) go to 999
    if ((ypoint2(k) < 0.).or.(ypoint2(k) > ny+epsil2)) go to 999
  enddo
+ print *,'ypoint ',ypoint1(1),ypoint2(1)
+ print *,'ypoint ',ypoint1(numpoint),ypoint2(numpoint)
  
  doyy: do yy=year_b,year_e  
 !  load the tropopause height in theta
@@ -2067,6 +2076,8 @@ end subroutine readreleasesB2
        tropofile=trim(tropodir)//'/tropo-theta-EI-'//yyyy//'.bin'
      case ('MERRA')
        tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//yyyy//'.bin'
+     case ('JRA55')
+       tropofile=trim(tropodir)//'/tropo-theta-JRA-'//yyyy//'.bin'
    end select  
    open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
    if(mod(yy,4)==0) then
@@ -2078,6 +2089,10 @@ end subroutine readreleasesB2
    do dyr=1,year_length
      read(tropunit,rec=dyr) buff
      tropoz(:,:,dyr)=reshape(buff,(/nx,ny/))
+     !if((yy==year_b).and.(dyr==180)) then
+     !  print *,'tropo meridional section'
+     !  print *,sum(tropoz(:,:,dyr),1)/nx
+     !endif
    enddo
    print *,'tropopause loaded ',yy
    domm: do mm=1,12
@@ -2159,6 +2174,7 @@ end subroutine readreleasesB2
    deallocate(tropoz)
    close(tropunit)
  enddo doyy
+ flush 6
  deallocate(buff)
  open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
  write(unitpartout4) xtra1(1:numpart)
@@ -2193,14 +2209,348 @@ end subroutine readreleasesB2
       print *,k,xpoint1(k),xpoint2(k),ypoint1(k),ypoint2(k)
       return
 
-995   error=.true.
+      end subroutine fixmultilayer_tropomask
+      
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@ FIXMULTILAYER_TROPOMASK_TEMP @@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+
+ subroutine fixmultilayer_tropomask_temp(error)
+!*******************************************************************************b
+!                                                                              *
+!     This routine fixes the release times and release locations of all        *
+!     particles a fixed number of potential temperature layers.
+!     In addition calculate the temperature at each launch location            *
+!                                                                              *
+!     Author: B. Legras
+!     23 March 2015
+!     from the previous version of fixmultilayer_tropomask                                                                       *
+!    
+!                                                                              *
+!*******************************************************************************
+!                                                                              *
+! Variables:                                                                   *
+!                                                                              *
+!*******************************************************************************
+ use jra55
+ real (dp) :: xc,yc,zc, epsil,epsil2, ylat, xlm
+ real (dp) :: corrected_mesh_size, ddx, ddy
+ real (dbl) :: datef
+ real (dp), allocatable :: tropoz(:,:,:),buff(:)
+ integer :: k,ix,jy,it,tt,yy,mm,dd,ll,dyr
+ integer :: year_length,ldayscum(12)
+ character (len=4) :: year
+ character (len=2) :: month,day
+ character (len=256) :: tropofile
+ integer nb_points_latcircle
+ logical error
+ integer :: idxt,idxps,lat,nbtheta,iret,igrib,l, errm
+ real(dp), allocatable :: values(:),val_gauss(:,:),logzp(:),logpzp(:),mtab(:)
+ real(dp), allocatable :: log_press_prof(:), log_theta_prof(:), temp_prof(:)
+ real(dp):: psaver,tropoxy
+ 
+ ldayscum=(/0,31,59,90,120,151,181,212,243,273,304,334/)
+
+ error = .false.
+ epsil =  1.e-3 ; epsil2=1.e-7
+ 
+ if (.not.allocated(itra0)) allocate (itra0(maxpart))
+ if (.not.allocated(ttra1)) allocate (ttra1(maxpart))
+ allocate (values((nx-1)*ny),val_gauss(nx-1,ny))
+ call alloc_isentrop_perm
+ allocate (log_theta_prof(lower_theta_level:upper_theta_level))
+ allocate (log_press_prof(lower_theta_level:upper_theta_level))
+ allocate (temp_prof(lower_theta_level:upper_theta_level))
+ allocate (mtab(lower_theta_level:upper_theta_level))
+ nbtheta=upper_theta_level-lower_theta_level+1
+ allocate (logzp(numpoint),logpzp(numpoint))
+ logzp=log(zpoint1(1:numpoint))
+      
+ numpart=0 
+ print *,'numpoint ',numpoint
+ print *,'path',path(2)
+ mesh_size_lat  = mesh_size_lat/dy
+ mesh_size_long = mesh_size_long/dx
+ print *,'fixmultilayer_temp > meshs ',mesh_size_long,mesh_size_lat
+ print *,'fixmultilayer_temp > xlon0,ylat0,dx,dy ',xlon0,ylat0,dx,dy
+ print *,'fixmultilayer_temp > year_b year_e ',year_b,year_e
+! loops on the years, months and days
+! note that time note used
+ tt=0
+ allocate(buff(ny*nx))
+ ! calculate the size of packet_size
+ ll=0
+ do yy=year_b,year_e
+   if(mod(yy,4)==0) then
+     ll=366+ll
+   else
+     ll=365+ll
+   endif
+ enddo
+ allocate (packet_len(ll))
+ 
+! Shift of xpoint and ypoint 
+ do k=1,numpoint
+   xpoint1(k) = (xpoint1(k)-xlon0)/dx
+   xpoint2(k) = (xpoint2(k)-xlon0)/dx
+   ypoint1(k) = (ypoint1(k)-ylat0)/dy
+   ypoint2(k) = (ypoint2(k)-ylat0)/dy
+   if ((xpoint1(k) < 0.).or.(xpoint1(k) > nx-1+epsil2)) go to 999
+   if ((xpoint2(k) < 0.).or.(xpoint2(k) > nx-1+epsil2)) go to 999
+!  Deactivated because it fails for MERRA due to the poles not belonging
+!  to the list of latitudes
+ !  if ((ypoint1(k) < 0.).or.(ypoint1(k) > ny+epsil2)) go to 999
+   if ((ypoint2(k) < 0.).or.(ypoint2(k) > ny+epsil2)) go to 999
+ enddo
+ print *,'ypoint ',ypoint1(1),ypoint2(1)
+ print *,'ypoint ',ypoint1(numpoint),ypoint2(numpoint)
+ 
+ 
+ !#####################################
+ ! TEMPORAY TEST START
+ !numpart=26214494
+ !if(numpart>0) then
+ !  open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
+ !  read(unitpartout4) xtra1(1:numpart)
+ !  read(unitpartout4) ytra1(1:numpart)
+ !  read(unitpartout4) ztra1(1:numpart)
+ !  read(unitpartout4) ttra1(1:numpart)
+ !  read(unitpartout4) itra0(1:numpart)
+ !  close(unitpartout4)
+ !  itra1(1:numpart)=itra0(1:numpart)
+ !  print *,'special restart from sav_init'
+ !  return
+ !endif
+ !##################################### 
+ 
+ doyy: do yy=year_b,year_e  
+!  load the tropopause height in theta
+!  should have been generated with same grid, that is with an exyra column
+   write(year,'(I4)')yy
+   select case (data_source)
+     case ('EI')
+       tropofile=trim(tropodir)//'/tropo-theta-EI-'//year//'.bin'
+     case ('MERRA')
+       tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//year//'.bin'
+     case ('JRA55')
+       tropofile=trim(tropodir)//'/tropo-theta-JRA-'//year//'.bin'
+   end select
+   open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
+   if(mod(yy,4)==0) then
+     year_length=366
+   else
+     year_length=365
+   endif
+   allocate (tropoz(0:nx-1,0:ny-1,year_length))
+   do dyr=1,year_length
+     read(tropunit,rec=dyr) buff
+     tropoz(:,:,dyr)=reshape(buff,(/nx,ny/))
+     !if((yy==year_b).and.(dyr==180)) then
+     !  print *,'tropo meridional section'
+     !  print *,sum(tropoz(:,:,dyr),1)/nx
+     !endif
+   enddo
+   print *,'tropopause loaded ',yy
+   domm: do mm=1,12
+!    read indexes here
+     write(month,'(I2.2)')mm
+     call grib_index_read(idxt, &
+     path(3)(1:len_path(3))//year//'/'//'uvwt-'//year//'-'//month//'.gribidx');
+     call grib_index_read(idxps, &
+     path(3)(1:len_path(3))//year//'/'//'ps-'//year//'-'//month//'.gribidx');
+!    days 10 and 20 of each month are used
+     dodd: do dd=10,20,10
+       write(day,'(I2.2)')dd
+       tt=tt+1
+       datef=juldate(10000*yy+100*mm+dd,120000)
+       it=nint((datef-bdate)*86400._dp)
+!      define time to be on a time-step boundary
+       it=it-mod(it,abs(lsynctime)) 
+       dyr=dd+ldayscum(mm)
+       if (mod(yy,4)==0 .and. mm>2) dyr=dyr+1
+!      loop on the number of layers
+       packet_len(tt)=0
+       
+!      here read the temperature and ps data from the required time
+       call grib_index_select(idxt,'mars.date',year//month//day)
+       call grib_index_select(idxt,'mars.time','1200')
+       call grib_index_select(idxt,'mars.param','11.200')
+       do l=1,nuvz
+         call grib_index_select(idxt,'mars.levelist',l)
+         call grib_new_from_index(idxt,igrib, iret)
+         call grib_get_real4_array(igrib,'values',values,iret)      
+         val_gauss=reshape(values,(/nx-1,ny/))
+!        Interpolation to regular grid
+!        Non polar latitudes only
+         do lat=1,ny
+           tth(0:nx-2,ny-lat,l,1) = w1(lat)*val_gauss(1:nx-1,g1(lat)) &
+                                   +w2(lat)*val_gauss(1:nx-1,g2(lat))
+         enddo
+         if(xglobal) tth(nx-1,0:ny-1,l,1) = tth(0,0:ny-1,l,1)
+       enddo
+       call grib_index_select(idxps,'mars.date',year//month//day)
+       call grib_index_select(idxps,'mars.time','1200')
+       call grib_new_from_index(idxps,igrib, iret)
+       call grib_get_real4_array(igrib,'values',values)
+       val_gauss=reshape(values,(/nx-1,ny/))      
+       do lat=1,ny
+         ps(0:nx-2,ny-lat,1,1) = w1(lat)*val_gauss(1:nx-1,g1(lat)) &
+                                +w2(lat)*val_gauss(1:nx-1,g2(lat))
+       enddo
+       if(xglobal) ps(nx-1,0:ny-1,1,1) = ps(0,0:ny-1,1,1)
+!      Assume that xpoint and ypoint do not depend on the level
+ 
+       if (xglobal) then
+         xlm=xpoint2(1)
+       else
+         xlm=xpoint2(1)+epsil
+       endif
+
+       yc = ypoint1(1)
+       dolat: do while (yc < ypoint2(1)+epsil)
+           ! minmax for the case of the pole off the grid to avoid getting -1
+           jy=min(ny-2,max(0,floor(yc)))
+           ddy=yc-jy
+           ylat = (ylat0 + yc*dy)*pi/180._dp
+!          defined corrected longitude mesh if needed           
+           if (uniform_mesh.and.uniform_spread) then
+             nb_points_latcircle = int(nx*abs(cos(ylat))/mesh_size_long)
+             if(nb_points_latcircle>0) then
+               corrected_mesh_size = float(nx-1)/nb_points_latcircle
+             else 
+               corrected_mesh_size = 2*float(nx-1) ! set a large value to get only 1 pt on circle
+             endif
+           else if (uniform_spread) then
+             corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
+           else
+             corrected_mesh_size = mesh_size_long
+           endif
+!          loop in longitude
+           xc = xpoint1(1)
+           dolong: do while (xc < xlm)
+             ix=floor(xc)
+             ddx=xc-ix
+             ! test the tropopause
+             ! it is assumed that the tropopause has same grid as the wind
+             ! make sure to read the file that corresponds to the reanalysis in use
+             tropoxy  = tropoz(ix,jy,dyr)*(1-ddx)*(1-ddy) &
+                       +tropoz(ix+1,jy,dyr)*(1-ddx)*ddy &
+                       +tropoz(ix,jy+1,dyr)*ddx*(1-ddy) &
+                       +tropoz(ix+1,jy+1,dyr)*ddx*ddy
+             ! calculate theta column on adjacent points
+             call calc_col_theta(ix,jy,1)
+             call calc_col_theta(ix+1,jy,1)
+             call calc_col_theta(ix,jy+1,1)
+             call calc_col_theta(ix+1,jy+1,1)
+             ! psaver in Pascal
+             psaver=ps(ix,jy,1,1)*(1-ddx)*(1-ddy) + ps(ix+1,jy,1,1)*(1-ddx)*ddy &
+                   +ps(ix,jy+1,1,1)*ddx*(1-ddy) + ps(ix+1,jy+1,1,1)*ddx*ddy
+             log_theta_prof=log(theta_g(:,ix,jy,1)*(1-ddx)*(1-ddy) &
+                               +theta_g(:,ix+1,jy,1)*(1-ddx)*ddy &
+                               +theta_g(:,ix,jy+1,1)*ddx*(1-ddy) &
+                               +theta_g(:,ix+1,jy+1,1)*ddx*ddy)
+             log_press_prof=log(akz(lower_theta_level:upper_theta_level) &
+                           +bkz(lower_theta_level:upper_theta_level)*psaver)
+             temp_prof=tth(ix,jy,lower_theta_level:upper_theta_level,1)*(1-ddx)*(1-ddy) &
+                      +tth(ix+1,jy,lower_theta_level:upper_theta_level,1)*ddx*(1-ddy)   &
+                      +tth(ix,jy+1,lower_theta_level:upper_theta_level,1)*(1-ddx)*ddy   &
+                      +tth(ix+1,jy+1,lower_theta_level:upper_theta_level,1)*ddx*ddy
+             k=1
+             do while (zpoint1(k)<tropoxy)
+               k=k+1
+             enddo
+             packet_len(tt)=packet_len(tt)+numpoint-k+1
+             xtra1(numpart+1:numpart+numpoint-k+1)=xc
+             ytra1(numpart+1:numpart+numpoint-k+1)=yc
+             ztra1(numpart+1:numpart+numpoint-k+1)=zpoint1(k:numpoint)
+             itra1(numpart+1:numpart+numpoint-k+1)=it
+             itra0(numpart+1:numpart+numpoint-k+1)=it
+             ! check that the interpolation range is Ok
+             if (zpoint1(k) < exp(log_theta_prof(lower_theta_level))) then
+                print *,'lower theta exceeded'
+                print *,k,zpoint1(k),exp(log_theta_prof(lower_theta_level)),psaver
+                print *,ix,jy,xlon0+ix*dx,ylat0+jy*dy
+             endif
+             if (zpoint1(numpoint) > exp(log_theta_prof(upper_theta_level))) then
+                print *,'upper theta exceeded'
+                print *,k,zpoint1(numpoint),exp(log_theta_prof(upper_theta_level)),psaver
+                print *,ix,jy,xlon0+ix*dx,ylat0+jy*dy
+             endif
+             call slopes(log_theta_prof,log_press_prof,mtab,nbtheta)
+             call meval_spe(logzp(k:numpoint),logpzp(k:numpoint),& 
+                 log_theta_prof,log_press_prof,mtab,nbtheta,numpoint-k+1,0.,errm)
+             if (errm>0) then
+               print *,'error in getting pressure from theta ',errm
+               error=.true.
+             endif
+             ! failing uvip3p due to large variations in the gradient of theta
+             ! replaced by slopes/meval, see interpol in sandbox
+             !call uvip3p(1,nbtheta,log_theta_prof,log_press_prof, &
+             !           numpoint-k+1,logzp(k:numpoint),logpzp(k:numpoint))
+             call uvip3p(3,nbtheta,-log_press_prof,temp_prof, & 
+                        numpoint-k+1,-logpzp(k:numpoint),&
+                        ttra1(numpart+1:numpart+numpoint-k+1))
+             ! check interpolation errors generating negative temperatures
+             if(minval(ttra1(numpart+1:numpart+numpoint-k+1))<=0) then
+               print *,'ttra1 ',ttra1(numpart+1:numpart+numpoint-k+1)
+               print *,'press_prof ',exp(log_press_prof)
+               print *,'temp_prof ',temp_prof
+               print *,'pzp ',exp(logpzp(k:numpoint))
+               print *,'theta_prof ',exp(log_theta_prof)
+               print *,'zp ',exp(logzp(k:numpoint))
+             endif
+             numpart=numpart+numpoint-k+1
+             if(numpart>maxpart) go to 996      
+             xc = xc + corrected_mesh_size
+           enddo dolong
+           yc = yc + mesh_size_lat
+         enddo dolat
+       write(*,'("tt it yyyymmdd packet_len",I5,I12,3X,I4,2I2.2, I10)') &
+             tt,it,yy,mm,dd,packet_len(tt)
+     enddo dodd
+     call grib_index_release(idxt)
+     call grib_index_release(idxps)
+   enddo domm
+   deallocate(tropoz)
+   close(tropunit)
+   flush 6
+ enddo doyy
+ deallocate(buff,values,val_gauss,theta_g,theta_col,theta_inv_col)
+ open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
+ write(unitpartout4) xtra1(1:numpart)
+ write(unitpartout4) ytra1(1:numpart)
+ write(unitpartout4) ztra1(1:numpart)
+ write(unitpartout4) ttra1(1:numpart)
+ write(unitpartout4) itra0(1:numpart)
+ close(unitpartout4)
+ call savsav(0)
+ 
+ print *,'fixmultilayer_temp > completed, layers, numpart ',numpoint, numpart
+ return
+
+996   error=.true.
+      print *,'numpart ',numpart
+      print *,'xc yc ',xc,yc
       write(*,*) '#####################################################'
-      write(*,*) '###  ERROR THE LAUNCH INTERVAL IS NOT A DIVIDER   ###'
-      write(*,*) '###  OF THE START - END PERIOD                    ###'
+      write(*,*) '#### SUBROUTINE FIXMULTILAYER_TROPOMASK_TEMP     ####'
+      write(*,*) '####                                             ####'
+      write(*,*) '#### ERROR - TOTAL NUMBER OF PARTICLES SPECIFIED ####'
+      write(*,*) '#### IN FILE "RELEASES" OR CARRIED FORWARD FROM  ####'
+      write(*,*) '#### PREVIOUS RUN EXCEEDS THE MAXIMUM ALLOWED    ####'
+      write(*,*) '#### NUMBER. REDUCE EITHER NUMBER OF PARTICLES   ####'
+      write(*,*) '#### PER RELEASE POINT OR REDUCE NUMBER OF       ####'
+      write(*,*) '#### RELEASE POINTS.                             ####'
       write(*,*) '#####################################################'
       return
+      
+999   error=.true.
+      write(*,*) '#####################################################'
+      write(*,*) '###  ERROR IN THE XPOINT YPOINT INITIALIZATION    ###'
+      write(*,*) '#####################################################'
+      print *,k,xpoint1(k),xpoint2(k),ypoint1(k),ypoint2(k)
+      return
 
-      end subroutine fixmultilayer_tropomask
+      end subroutine fixmultilayer_tropomask_temp
       
 !===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SETPOS0FROMEXT @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -2230,9 +2580,9 @@ end subroutine readreleasesB2
 ! Local sizes
   integer :: packet_size, count_t
 ! Local itra, xtra, ytra, ztra
-  integer*4, allocatable, dimension(:) :: itra_l
-  real*4, allocatable, dimension(:) :: xtra_l, ytra_l
-  real*4, allocatable, dimension(:,:) :: ztra_l
+  integer(kind=4), allocatable, dimension(:) :: itra_l
+  real(sp), allocatable, dimension(:) :: xtra_l, ytra_l
+  real(sp), allocatable, dimension(:,:) :: ztra_l
 ! do index
   integer :: i
   
@@ -2335,7 +2685,6 @@ end subroutine readreleasesB2
   
   print *,'setpos0fromext completed'
 
-  
   
   end subroutine setpos0fromext
 
@@ -3627,14 +3976,6 @@ end subroutine readreleasesB2
     write(*,*) '#####################################################'
     return
 
-999 error=.true.
-    write(*,*) '#####################################################'
-    write(*,*) '#### FLEXPART MODEL SUBROUTINE FIXPARTICLES      ####'
-    write(*,*) '####                                             ####'
-    write(*,*) '#### ERROR DIFFERENT NUMPART (LOOP ON THE TIME)  ####'
-    write(*,*) '#####################################################'
-    return
-
 1000 error=.true.
      write(*,*) '#####################################################'
      write(*,*) '#### FLEXPART MODEL SURBROUTINE FIXPARTICLES     ####'
@@ -3711,7 +4052,7 @@ end subroutine readreleasesB2
       endif
 
       if((ibyeartrac<1997).OR.(ibyeartrac>2009)) then
-         stop('check ibdate to use Claus data')
+         stop 'check ibdate to use Claus data'
       endif
 
       tab_day_month = (/31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/)
