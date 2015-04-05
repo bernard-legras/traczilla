@@ -55,7 +55,7 @@ contains
       integer itime,i1,i2,j,jseg,if,i,outfmt,lhead
       integer ihour,jjjjmmdd,ihmmss,nbuf,try,ierr      
       integer (kind=4), allocatable:: itra(:)
-      real (kind=4), allocatable:: xyz(:,:)
+      real (sp), allocatable:: xyz(:,:)
       character(len=6):: chour
 
       ihour=abs(itime)/3600
@@ -154,7 +154,7 @@ contains
       integer i,outfmt,lhead
       integer ihour,nact     
       integer (kind=4), allocatable:: itra(:),idx(:)
-      real (kind=4), allocatable:: xyzt(:,:)
+      real(sp), allocatable:: xyzt(:,:)
       character(len=6):: chour
 
       ihour=abs(itime)/3600
@@ -170,7 +170,7 @@ contains
 
 !     Generates a reduced file with all the active parcels
       nact=0
-      allocate (itra(maxpart),idx(maxpart),xyzt(4,maxpart))
+      allocate (itra(numpart),idx(numpart),xyzt(4,numpart))
       dopart: do i=1,numpart
         if(itra1(i)==itime) then
           nact=nact+1
@@ -234,7 +234,7 @@ contains
       integer i1,i2,j,jseg,iff,i,outfmt,lhead
       integer ihour,jjjjmmdd,ihmmss,nbuf      
       integer (kind=4), allocatable:: itra(:)
-      real (kind=4), allocatable:: xyztq(:,:)
+      real(sp), allocatable:: xyztq(:,:)
       character(len=6):: chour
 
       ihour=abs(itime)/3600
@@ -320,9 +320,9 @@ contains
 !*******************************************************************************
 
       integer, intent(in):: itime
-      integer j,outfmt,lhead
-      integer jjjjmmdd,ihmmss      
-      integer system
+      integer :: j,outfmt,lhead
+      integer :: jjjjmmdd,ihmmss      
+      integer :: system
 
 ! Output all particles in raw format  
 !*************************************
@@ -380,14 +380,14 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer ibdate_arch,ibtime_arch,lhead,outfmt
+      integer :: ibdate_arch,ibtime_arch,lhead,outfmt
       character(len=12):: r_plan
       logical, intent(out):: error
-      logical itra0_activ,ttra1_activ,qtra1_activ
+      logical :: itra0_activ,ttra1_activ,qtra1_activ
 
       error=.false.
       print *,'##### restart run ####' 
-   
+      
 ! Open the file  
 !*************************************
 
@@ -448,17 +448,20 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer i1,i2,if,i,j,jseg,nbuf,ir
-      integer ibdate_arch,ibtime_arch,lhead,outfmt
+      integer :: i1,i2,if,i,j,jseg,nbuf
+      integer :: ibdate_arch,ibtime_arch,lhead,outfmt
       integer (kind=4), allocatable:: itra(:),idx(:)
-      real (kind=4), allocatable:: xyz(:,:)
+      real (sp), allocatable:: xyz(:,:)
       integer (kind=4):: ddin(3)
       character(len=6):: chour
       character(len=12):: r_plan
       logical,intent(out):: error
+      logical :: ttra1_activ
 
       error=.false.
-      print *,'##### restart run ####' 
+      print *,'##### restart run ####'
+      
+      if(AGEBactiv) ttra1_activ=.true. 
    
 ! Open the file  
 !*************************************
@@ -553,7 +556,7 @@ contains
         jseg=numpart/nbuf
         i1=1 ; i2=nbuf ; if=nbuf
         do j=1, jseg
-          read(unitpartin)  (xyz(1:ir,i),itra(i),i=1,if)
+          read(unitpartin)  (xyz(1:3,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
           ytra1(i1:i2)=(xyz(2,1:if)-ylat0)/dy
           ztra1(i1:i2)= xyz(3,1:if)
@@ -562,7 +565,7 @@ contains
         enddo
         if(if*jseg<numpart) then
           i2=numpart ; if=i2-i1+1
-          read(unitpartin) (xyz(1:ir,i),itra(i),i=1,if)
+          read(unitpartin) (xyz(1:3,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
           ytra1(i1:i2)=(xyz(2,1:if)-ylat0)/dy
           ztra1(i1:i2)= xyz(3,1:if)
@@ -574,7 +577,7 @@ contains
         jseg=numpart/nbuf
         i1=1 ; i2=nbuf ; if=nbuf
         do j=1, jseg
-          read(unitpartin)  (xyz(1:ir,i),itra(i),i=1,if)
+          read(unitpartin)  (xyz(1:5,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
           ytra1(i1:i2)=(xyz(2,1:if)-ylat0)/dy
           ztra1(i1:i2)= xyz(3,1:if)
@@ -584,7 +587,7 @@ contains
         enddo
         if(if*jseg<numpart) then
           i2=numpart ; if=i2-i1+1
-          read(unitpartin) (xyz(1:ir,i),itra(i),i=1,if)
+          read(unitpartin) (xyz(1:5,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
           ytra1(i1:i2)=(xyz(2,1:if)-ylat0)/dy
           ztra1(i1:i2)= xyz(3,1:if)
@@ -600,6 +603,10 @@ contains
         read(unitpartout4)ytra1(1:numpart)
         read(unitpartout4)ztra1(1:numpart)
         read(unitpartout4)itra0(1:numpart)
+        if (ttra1_activ) then
+         if(.not.allocated(ttra1)) allocate(ttra1(numpart))
+         read(unitpartout4) ttra1(1:numpart)
+        endif
         itra1(1:numpart)=itra0(1:numpart)
         close(unitpartout4)
         allocate (xyz(4,nbuf),itra(nbuf),idx(nbuf))
@@ -611,6 +618,11 @@ contains
           ztra1(j)=xyz(3,i)
           itra1(j)=itime0
         enddo
+        if (ttra1_activ) then
+          do i=1,nbuf
+            ttra1(idx(i))=xyz(4,i)
+          enddo
+        endif
       end select
       print *,'restart > completed'
       close(unitpartin)
@@ -639,9 +651,9 @@ contains
 !*******************************************************************************
 
       integer, intent(in):: itime
-      integer j,outfmt,lhead
-      integer jjjjmmdd,ihmmss      
-      integer system
+      integer :: j,outfmt,lhead
+      integer :: jjjjmmdd,ihmmss      
+      integer :: system
 
 ! Output all particles in raw format  
 !*************************************
@@ -694,7 +706,7 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer ibdate_arch,ibtime_arch,lhead,outfmt,idumb
+      integer :: lhead,outfmt
       logical, intent(out):: error
 
       error=.false.
@@ -746,9 +758,9 @@ contains
 !*******************************************************************************
 
       integer, intent(in):: itime
-      integer j,outfmt,lhead
-      integer jjjjmmdd,ihmmss      
-      integer system
+      integer :: j,outfmt,lhead
+      integer :: jjjjmmdd,ihmmss      
+      integer :: system
 
 ! Output all particles in raw format  
 !*************************************
@@ -797,7 +809,7 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer ibdate_arch,ibtime_arch,lhead,outfmt,idumb
+      integer :: lhead,outfmt
       logical, intent(out):: error
 
       error=.false.
@@ -830,7 +842,7 @@ contains
 ! 
       integer, intent(IN) ::unit
       integer, optional, intent(out) :: ierr
-      integer mm
+      integer :: mm
       integer, intent(IN), dimension(:):: datas
       integer(kind=4):: ii(10)
       mm = size(datas) ; if (mm > 10) mm=10
