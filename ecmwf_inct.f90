@@ -36,7 +36,6 @@ use isentrop_m
 use ecmwf_diab
 implicit none
 save
-
 integer idiffmax_inct,idiffnorm_inct
 parameter(idiffmax_inct=43200,idiffnorm_inct=43200)
 
@@ -808,8 +807,6 @@ end subroutine alloc_ecmwf_inct
 ! Coefficients are initialized in diab_mass_init belonging to the module
 ! ecmwf_diab which must be used together with this module
 !*************************************************************************************
-
-  NPureP=23
 
   if(.not.(xglobal.and.nglobal.and.sglobal)) then
       write(*,*) ' #### TRACZILLA MODEL ERROR! DIAB_MASS        #### ' 
