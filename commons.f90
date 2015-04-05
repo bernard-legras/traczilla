@@ -75,7 +75,7 @@ module commons
 ! Some time constants
 !********************
 
-      integer, parameter :: idiffnorm=10800,idiffmax=2*idiffnorm,minstep=1
+      integer, parameter :: idiffnorm=21600,idiffmax=2*idiffnorm,minstep=1
 
 ! idiffnorm [s]           normal time interval between two wind fields
 ! idiffmax [s]            maximum time interval between two wind fields
@@ -86,7 +86,7 @@ module commons
 ! Parameters for polar stereographic projection close to the poles
 !*****************************************************************
 
-      real, parameter :: switchnorth=75.,switchsouth=-75.
+      real(dp), parameter :: switchnorth=75._dp,switchsouth=-75._dp
 
 ! switchnorth    use polar stereographic grid north of switchnorth
 ! switchsouth    use polar stereographic grid south of switchsouth
@@ -126,7 +126,7 @@ module commons
 ! Maximum number of particles, species, wind fields and similar
 !**************************************************************
 
-      integer, parameter :: maxpart=60000000,maxpoint=50,maxspec=1
+      integer, parameter :: maxpart=30000000,maxpoint=50,maxspec=1
 !     integer, parameter :: maxpart=3000000,maxpoint=50,maxspec=1
       integer, parameter :: maxwf=150000,maxtable=1000,numclass=9,ni=11
 
@@ -170,7 +170,7 @@ module commons
 !***************
 
       integer, parameter :: BIG_INT=2**30, ZERO_INIT=0
-      real, parameter :: MISSING=1.e99_dp
+      real(dp), parameter :: MISSING=1.e38_dp
 
 !**********************************************
 ! constant pressure to define vertical velocity
@@ -328,7 +328,7 @@ module commons
 ! Variables associated with the ECMWF meteorological input data ("wind fields")
 !******************************************************************************
 
-      integer numbwf,wftime(maxwf),wfldat(maxwf),wfltim(maxwf),lwindinterv
+      integer ::numbwf,wftime(maxwf),wfldat(maxwf),wfltim(maxwf),lwindinterv
       character(len=16):: wfname(maxwf),wfspec(maxwf)
 
 ! lwindinterv [s]         Interval between wind fields currently in memory
@@ -338,7 +338,7 @@ module commons
 ! wfspec(maxwf)           specifications of wind field file, e.g. if on hard 
 !                         disc or on tape
 
-      integer memtime(2),memind(2)
+      integer :: memtime(2),memind(2)
 
 ! memtime [s]             validation times of wind fields in memory
 ! memind                  pointer to wind field, in order to avoid shuffling
@@ -350,7 +350,7 @@ module commons
 ! or isentropic motion (see also headings of isentrop.f90)
 !***********************************************************
 
-      logical z_motion
+      logical :: z_motion
 
 ! z_motion                use z=ln(p0/p) as vertical coordinate
 !                         and interpolate wind to z level
@@ -360,8 +360,8 @@ module commons
 ! (see also headings of ecmwf_diab, ecmwf_inct, merra
 !***********************************************************
 		
-      logical clear_sky, cloud_sky
-      logical mass_correction, mean_diab_output
+      logical :: clear_sky, cloud_sky
+      logical :: mass_correction, mean_diab_output
 
 ! clear_sky		  Use of clear sky tendency (LW+SW)
 ! cloud_sky               Use of cloud sky radiative tendency (LW+SW) no latent
@@ -370,8 +370,8 @@ module commons
 !                         such that mean mass flux is zero across this surface
 ! mean_diab_output	  output of the mean mass flux before correction	
 
-      integer numbwf_diab,wftime_diab(maxwf),lwindinterv_diab
-      character(len=11):: wfname_diab(maxwf),wfspec_diab(maxwf)
+      integer :: numbwf_diab,wftime_diab(maxwf),lwindinterv_diab
+      character(len=16):: wfname_diab(maxwf),wfspec_diab(maxwf)
 
 ! lwindinterv_diab [s]    Interval between wind fields currently in memory
 ! numbwf_diab             actual number of wind fields
@@ -380,19 +380,19 @@ module commons
 ! wfspec_diab(maxwf)      specifications of wind field file, e.g. if on hard 
 !                         disc or on tape
 
-      integer memtime_diab(2),memind_diab(2)
+      integer :: memtime_diab(2),memind_diab(2)
 
 ! memtime_diab [s]        validation times of wind fields in memory
 ! memind_diab             pointer to wind field, in order to avoid shuffling
 !                         of wind fields
 
-      real, allocatable :: w_diab(:,:,:,:)
+      real(dp), allocatable :: w_diab(:,:,:,:)
 
 ! w_diab [K/s]            vertical velocity as tendency in potential temperature
  
 	
       character(len=128):: path_diab(2)
-      integer len_diab(2)
+      integer :: len_diab(2)
 
 ! path_diab               paths for diabatic directory and associated 
 !                         AVAILABLE file
@@ -402,7 +402,7 @@ module commons
 ! Variables defining actual size and geographical location of the wind fields
 !****************************************************************************
       integer nx,ny,nxfield,nuvz,nwz,nz,nmixz,nlev_ec
-      real dx,dy,xlon0,ylat0,dxconst,dyconst,zmax
+      real(dp) :: dx,dy,xlon0,ylat0,dxconst,dyconst,zmax
 
 ! nx,ny,nz  L             actual dimensions of wind fields in x,y and z
 !                         direction, respectively
@@ -430,12 +430,14 @@ module commons
 ! Variables used for vertical model discretization
 !*************************************************
 
-      real akm(nwzmax),bkm(nwzmax)
-      real akz(nuvzmax),bkz(nuvzmax)
-
-! akm,bkm: coeffizients which regulate vertical discretization of ecmwf model
+      real(dp) ,allocatable :: akm(:),bkm(:)
+      real(dp), allocatable :: akz(:),bkz(:)
+      real(dp), allocatable :: etakzlog(:) 
+     
+! akm,bkm: coefficients which regulate vertical discretization of ecmwf model
 !          (at the border of model layers)
 ! akz,bkz: model discretization coeffizients at the centre of the layers
+! etakzlog : log of eta=a+b
 
 
 !*****************************************
@@ -446,10 +448,10 @@ module commons
 ! diftype: diffusion type. 1: in z; 2: in pot. temp.
 ! nsample
 
-      real diffus
-      logical verdiff,hordiff
-      integer diftype
-      integer nsample(maxpoint),numlevel(maxpoint)
+      real(dp) :: diffus
+      logical :: verdiff,hordiff
+      integer :: diftype
+      integer :: nsample(maxpoint),numlevel(maxpoint)
        
 !*****************************************
 ! Variables associated with the tropopause
@@ -476,7 +478,7 @@ module commons
       character(len=128):: MOZAIC_dir, ER2_dir
       character(len=12):: index_type, campaign
       logical instant_release,interp_release
-      real start_ER2time, end_ER2time
+      real(dp) :: start_ER2time, end_ER2time
 
 !*********************************
 ! Variables associated with CLAUS 
@@ -494,14 +496,14 @@ module commons
 !************************************************
       
       logical :: track_kill, track_cross
-      real (dp), allocatable :: x_kill(:),y_kill(:),z_kill(:)
+      real(dp), allocatable :: x_kill(:),y_kill(:),z_kill(:)
       integer, allocatable   :: it_kill(:), nstop_kill(:)
       integer, allocatable   :: it_1800(:),it_2300(:)
 
 ! Fixed fields, unchangeable with time
 !*************************************
 
-      real, allocatable :: oro(:,:), lsm(:,:), excessoro(:,:)
+      real(dp), allocatable :: oro(:,:), lsm(:,:), excessoro(:,:)
 
 ! oro [m]              orography of the ECMWF model
 ! excessoro            excess orography mother domain
@@ -511,9 +513,9 @@ module commons
 ! 3d fields
 !**********
 
-      real, allocatable :: uupol(:,:,:,:),vvpol(:,:,:,:)
-      real, allocatable :: uuh(:,:,:,:),vvh(:,:,:,:),wwh(:,:,:,:)
-      real, allocatable :: tth(:,:,:,:),qvh(:,:,:,:)
+      real(dp), allocatable :: uupol(:,:,:,:),vvpol(:,:,:,:)
+      real(dp), allocatable :: uuh(:,:,:,:),vvh(:,:,:,:),wwh(:,:,:,:)
+      real(dp), allocatable :: tth(:,:,:,:),qvh(:,:,:,:)
  
 ! uuh,vvh,wwh [m/2] L   wind components in x,y and z direction
 ! uupol,vvpol [m/s] L   hor. wind components in polar stereographic projection
@@ -525,7 +527,7 @@ module commons
 ! 2d fields
 !**********
 
-      real, allocatable:: ps(:,:,:,:),u10(:,:,:,:),v10(:,:,:,:),tt2(:,:,:,:)
+      real(dp), allocatable:: ps(:,:,:,:),u10(:,:,:,:),v10(:,:,:,:),tt2(:,:,:,:)
 
 ! ps             L     surface pressure
 ! sd                   snow depth
@@ -541,8 +543,8 @@ module commons
 ! Variables defining the polar stereographic projection
 !******************************************************
 
-      logical xglobal,sglobal,nglobal
-      real switchnorthg,switchsouthg
+      logical :: xglobal,sglobal,nglobal
+      real(dp) :: switchnorthg,switchsouthg
 
 !     xglobal      L       T for global fields, F for limited area fields
 !     sglobal      L       T if domain extends towards south pole
@@ -550,7 +552,7 @@ module commons
 !     switchnorthg,switchsouthg L  same as parameters switchnorth,
 !                                  switchsouth, but in grid units
 
-      real southpolemap(9),northpolemap(9)
+      real(dp) :: southpolemap(9),northpolemap(9)
 
 !     southpolemap,northpolemap L  define stereographic projections
 !                         at the two poles
@@ -581,14 +583,14 @@ module commons
 ! Correcting vertical wind
 !**************************************
 
-      logical correct_vertwind
+      logical :: correct_vertwind
  
 
 !********************
 ! Random number field
 !********************
 
-      real rannumb(maxrand)
+      real(dp) :: rannumb(maxrand)
 
 ! rannumb                 field of normally distributed random numbers
 
@@ -597,7 +599,7 @@ module commons
 ! Debug
 !******************
 
-     logical debug_out
+     logical :: debug_out
 
 
 end module commons
