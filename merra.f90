@@ -25,29 +25,31 @@
 module merra
 
 !*******************************************************************************
-! This modules allow to use temperature tendencies archived at ECMWF as
-! vertical velocities.
-! Must be combined with isentropic interpolation
+! This modules allow to use MERRA data. 
+! Must be combined with isentropic code.
 !*******************************************************************************
 
 use commons
 use netcdf
 use isentrop_h
 implicit none
-private check
-save
-logical merra_data, merra_diab
+private :: check
+private :: NbLon, NbLat, NbPress
+logical, save :: merra_data, merra_diab
+private :: PSId, UId, VId, TId,  OMEGAId, LWRId, SWRId, LWRCLRId, SWRCLRId
+private :: grid_lat, grid_lon, grid_ver
+private :: PressLev, facT, LogPressLev, pmc_merra, area_coefft_merra
 
 ! iso_mass   specify we are using merra data
 
-integer :: NbTime, NbLon, NbLat, NbPress
-integer :: PSId, UId, VId, TId,  OMEGAId, LWRId, SWRId, LWRCLRId, SWRCLRId
-real :: missing_value
-real, allocatable :: PressLev(:), facT(:), LogPressLev(:), pmc_merra(:)
-real*8, allocatable :: grid_lat(:), grid_lon(:),grid_ver(:)
-real, allocatable :: area_coefft_merra(:)
+integer, save :: NbTime, NbLon, NbLat, NbPress
+integer, save :: PSId, UId, VId, TId,  OMEGAId, LWRId, SWRId, LWRCLRId, SWRCLRId
+real(dp), save :: missing_value
+real(dp), save, allocatable :: PressLev(:), facT(:), LogPressLev(:), pmc_merra(:)
+real(dbl), save, allocatable :: grid_lat(:), grid_lon(:),grid_ver(:)
+real(dp), save, allocatable :: area_coefft_merra(:)
 !real, allocatable :: theta_prof(:,:)
-integer :: NPMass
+integer, save :: NPMass
 
 ! PressLev [Pa]         pressure levels
 ! LogPressLev           log(p0/PressLev)
@@ -113,7 +115,7 @@ end subroutine alloc_merra
 
   use coord
   integer :: ifn, ncid
-  real :: sizesouth,sizenorth
+  real(dp) :: sizesouth,sizenorth
   integer :: LonId, LatId, VerId, TIMEId
   integer :: LonVId,LatVId,VerVId
  
@@ -122,14 +124,15 @@ end subroutine alloc_merra
   error=.false.
 
 ! Reads first or last field according to the direction of integration
-  if(ideltas.gt.0) then
-    ifn=1
-  else
-    ifn=numbwf
-  endif
+  !if(ideltas.gt.0) then
+  !  ifn=1
+  !else
+  !  ifn=numbwf
+  !endif
+  ifn=1
 
 ! Open the first file
-!  print *,ifn,wfname(ifn)
+  print *,ifn,path(3)(1:len_path(3))//wfname(ifn)
   call check(NF90_OPEN(path(3)(1:len_path(3))//wfname(ifn), &
       NF90_NOWRITE, ncid),1)     
 ! get dimension Id
@@ -177,6 +180,7 @@ end subroutine alloc_merra
     else
       ifn=numbwf_diab
     endif
+    print *,path_diab(1)(1:len_diab(1))//wfname_diab(ifn)
     call check(NF90_OPEN(path_diab(1)(1:len_diab(1))//wfname_diab(ifn), &
       NF90_NOWRITE, ncid),1)
     call check(NF90_INQ_VARID(ncid,'DTDTLWR',LWRId),24)
@@ -283,8 +287,8 @@ end subroutine alloc_merra
 !                                                                            *
 !*******************************************************************************
 
-      integer indj,indmin,indmin_diab,itime,nstop,memaux,i
-      save indmin,indmin_diab
+      integer :: indj,indmin,indmin_diab,itime,nstop,memaux
+      save :: indmin,indmin_diab
 
       data indmin/1/,indmin_diab/1/
 
@@ -378,7 +382,7 @@ end subroutine alloc_merra
       if (lwindinterv.gt.idiffmax) nstop=3
       
 ! 2nd part
-! Check, if wind fields are available for the current time step
+! Check, if heating rates are available for the current time step
 !**************************************************************
 
       if (merra_diab) then
@@ -397,7 +401,7 @@ end subroutine alloc_merra
         if ((ldirect*memtime_diab(1).le.ldirect*itime).and.   &
             (ldirect*memtime_diab(2).gt.ldirect*itime)) then
 
-! The right wind fields are already in memory -> don't do anything
+! The right heating rates are already in memory -> don't do anything
 !*****************************************************************
 
           continue
@@ -406,7 +410,7 @@ end subroutine alloc_merra
            (memtime_diab(2).ne.999999999)) then
  
 ! Current time is after 2nd wind field
-! -> Resort wind field pointers, so that current time is between 1st and 2nd
+! -> Resort heating rate pointers, so that current time is between 1st and 2nd
 !***************************************************************************
 
           memaux=memind_diab(1)
@@ -414,7 +418,7 @@ end subroutine alloc_merra
           memind_diab(2)=memaux
           memtime_diab(1)=memtime_diab(2)
 
-! Read a new wind field and store it on place memind(2)
+! Read a new heating rate and store it on place memind(2)
 !******************************************************
 
           do indj=indmin_diab,numbwf_diab-1
@@ -434,8 +438,8 @@ end subroutine alloc_merra
 
         else
 
-! No wind fields, which can be used, are currently in memory 
-! -> read both wind fields
+! No heating rates, which can be used, are currently in memory 
+! -> read both heating rates
 !***********************************************************
 
           do indj=indmin_diab,numbwf_diab-1
@@ -469,6 +473,10 @@ end subroutine alloc_merra
         if (lwindinterv.gt.idiffmax) nstop=3
       
       endif
+      
+! memind_diab set to memind because of the interpolation using memind_diab for w
+! even in the case of z_motion     
+      if(z_motion) memind_diab(1:2)=memind(1:2)
 
       return
       end subroutine getfields_merra
@@ -569,7 +577,7 @@ end subroutine alloc_merra
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
-	  subroutine read_merra_diab(indj,n)
+  subroutine read_merra_diab(indj,n)
 !**********************************************************************
 !                                                                     * 
 !             TRAJECTORY MODEL SUBROUTINE READ_MERRA_DIAB                  *
@@ -582,11 +590,11 @@ end subroutine alloc_merra
 
 !**********************************************************************
   integer, intent(in):: indj,n
-  real, allocatable :: buffer(:,:,:)
+  real(dp), allocatable :: buffer(:,:,:)
   integer :: ncid,it,ll
   character (len=2) :: hour
-  ll=len_trim(wfname(indj))
-  hour=wfname(indj)(ll-1:ll)
+  ll=len_trim(wfname_diab(indj))
+  hour=wfname_diab(indj)(ll-1:ll)
   select case(hour)
   case('00')
     it=1
@@ -635,7 +643,7 @@ end subroutine alloc_merra
   use coord
   integer, intent(in):: n
   integer :: ix, jy, iz, i, j
-  real :: xlon, ylat
+  real(dp) :: xlon, ylat
 
 ! north pole region
   if (nglobal) then
@@ -774,12 +782,12 @@ end subroutine alloc_merra
 !*******************************************************************************
 
   integer, intent(in) :: n,m
-  real, allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:), flux_lat(:),delta_theta(:,:)
-  real, allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:)
-  real, allocatable :: mean_w(:)
-  integer :: k,i,j
-  real :: buff
-  integer OMP_GET_THREAD_NUM
+  real(dp), allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:), flux_lat(:),delta_theta(:,:)
+  real(dp), allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:)
+  real(dp), allocatable :: mean_w(:)
+  integer :: k,i
+  real(dp) :: buff
+!  integer :: OMP_GET_THREAD_NUM
  
 !  print *,'enter diab_mass_merra'
 
@@ -929,22 +937,20 @@ subroutine interpol_wind_merra &
 
       integer, intent(in) :: itime,ngrid
       integer, intent(inout):: nstop
-      real, intent(in) :: xt,yt,zt
-      real, intent(out) :: tint
-      real, intent(out) :: dxdt,dydt,dzdt,z_factor
-      real, intent(out) :: theta_inf,theta_sup,psaver
+      real(dp), intent(in) :: xt,yt,zt
+      real(dp), intent(out) :: tint
+      real(dp), intent(out) :: dxdt,dydt,dzdt,z_factor
+      real(dp), intent(out) :: theta_inf,theta_sup,psaver
 
 ! Auxiliary variables needed for interpolation
-      real :: zlog(2)
-      real :: u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2),dt1_diab,dt2_diab,dtt_diab
-      real :: tr(2),trp(2),u(4,2),v(4,2),w(4,2),tp(4,2)
-      integer :: m,n,nn,indexh,indexh_diab,indz(2),ib,iu
-      integer :: ix,jy,ixp,jyp,i0,j0,idxy
-      real :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
-      real :: psl0,psup0,pinf0,pisup0,piinf0
+      real(dp) :: zlog(2)
+      real(dp) :: u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2),dt1_diab,dt2_diab,dtt_diab
+      real(dp) :: tr(2),trp(2),u(4,2),v(4,2),w(4,2),tp(4,2)
+      integer :: m,indexh,indexh_diab,indz(2)
+      integer :: ix,jy,ixp,jyp
+      real(dp) :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
       !real, allocatable :: theta_prof(:,:)
-      real :: theta_prof(250,2)
-      integer :: i,j,k
+      real(dp) :: theta_prof(250,2)
 
 !********************************************
 ! Multilinear interpolation in time and space
@@ -963,7 +969,7 @@ subroutine interpol_wind_merra &
       if (yt<0) then
          ddy=2*(yt+0.5_dp)
       else if (yt>ny-1) then
-         ddy=2*(yt+0.5_dp-ny)
+         ddy=2*(yt+1._dp-ny)
       else
          ddy=yt-float(jy)
       endif
@@ -1100,7 +1106,9 @@ subroutine interpol_wind_merra &
       endif
 
 !  Defines pressure at the 8 nearby meshpoints for
-!  the two times (quick n' dirty)
+!  the two times 
+!  Actually only 2 values since the levels are pure pressure
+!  which makes 4 when the next level is added
 
       tr (1) = LogPressLev(indz(1))
       tr (2) = LogPressLev(indz(2))
@@ -1311,7 +1319,7 @@ subroutine interpol_wind_merra &
 !*******************************************************************************
       function locp(zlog,ib1,iu1)
       integer, intent(in) :: ib1,iu1
-      real, intent(in) :: zlog
+      real(dp), intent(in) :: zlog
       integer :: locp,ib,iu,im
       ib=ib1 ; iu=iu1
       do while(iu-ib>1)
@@ -1327,9 +1335,8 @@ subroutine interpol_wind_merra &
 !*******************************************************************************      
       function locp2(zlog,ib1)
       integer, intent(in) :: ib1
-      real, intent(in) :: zlog
+      real(dp), intent(in) :: zlog
       integer :: locp2,ib
-      real :: pm
       ib=ib1
       if (zlog < LogPressLev(ib)) then
         do while(ib>1)
@@ -1347,7 +1354,7 @@ subroutine interpol_wind_merra &
 !*******************************************************************************          
       function locisent_merra(theta,ib1,iu1,ind,theta_prof)
       integer, intent(in) :: ib1,iu1,ind
-      real, intent(in) :: theta, theta_prof(:,:)
+      real(dp), intent(in) :: theta, theta_prof(:,:)
       integer :: locisent_merra,ib,iu,im
       ib=ib1 ; iu=iu1
       do while(iu-ib>1)
@@ -1363,7 +1370,7 @@ subroutine interpol_wind_merra &
 !*******************************************************************************      
       function locisent2_merra(theta,ib1,ind,theta_prof)
       integer, intent(in) :: ib1,ind
-      real, intent(in) :: theta, theta_prof(:,:)
+      real(dp), intent(in) :: theta, theta_prof(:,:)
       integer :: locisent2_merra,ib
       ib=ib1
       if (theta < theta_prof(ib,ind)) then
@@ -1387,8 +1394,8 @@ subroutine interpol_wind_merra &
       subroutine calc_col_theta_merra(x,y,ind)
       integer, intent(in) :: x, y, ind
 !     theta_diff  must be defined here to avoid // conflicts
-      real, allocatable :: theta_diff(:) ! 
-      real psl, tol
+      real(dp), allocatable :: theta_diff(:) ! 
+      real(dp) :: tol
       integer k, id, id1(1), nbunmix     
 !     Basic calculation of the potential temperature
       do k= lower_theta_level,upper_theta_level
@@ -1450,7 +1457,7 @@ subroutine interpol_wind_merra &
       
       subroutine check_merra_data(n)
       integer, intent(in) :: n
-      integer :: ix,jy,k,indz,um,vm,tm,count_c,count_miss
+      integer :: ix,jy,k,indz,um,count_c,count_miss
       
 !      print *,'check_merra_data'
       count_c=0
@@ -1476,7 +1483,7 @@ subroutine interpol_wind_merra &
            endif
          enddo
       enddo
-      write(*,'("check_merra_data",f6.2,"%")'),100.*count_miss/count_c      
+      write(*,'("check_merra_data",f6.2,"%")')100.*count_miss/count_c      
       return
       end subroutine check_merra_data
 
