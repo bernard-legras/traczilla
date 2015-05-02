@@ -57,8 +57,8 @@ ifeq ($(TARGET),X64-ng)
   MAIN = TRACZILLA-TT-ng
   CC = pgcc
   CFLAGS = -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
-  #FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
-  FFLAGS = -I$(HOME)/local/include -g -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
+  FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -I$(HOME)/local/include -g -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
   LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
 endif
 ifeq ($(TARGET),win)
