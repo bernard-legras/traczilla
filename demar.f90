@@ -2308,19 +2308,19 @@ end subroutine readreleasesB2
  
  !#####################################
  ! TEMPORAY TEST START
- !numpart=26214494
- !if(numpart>0) then
- !  open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
- !  read(unitpartout4) xtra1(1:numpart)
- !  read(unitpartout4) ytra1(1:numpart)
- !  read(unitpartout4) ztra1(1:numpart)
- !  read(unitpartout4) ttra1(1:numpart)
- !  read(unitpartout4) itra0(1:numpart)
- !  close(unitpartout4)
- !  itra1(1:numpart)=itra0(1:numpart)
- !  print *,'special restart from sav_init'
- !  return
- !endif
+! numpart=26214494
+! if(numpart>0) then
+!   open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
+!   read(unitpartout4) xtra1(1:numpart)
+!   read(unitpartout4) ytra1(1:numpart)
+!   read(unitpartout4) ztra1(1:numpart)
+!   read(unitpartout4) ttra1(1:numpart)
+!   read(unitpartout4) itra0(1:numpart)
+!   close(unitpartout4)
+!   itra1(1:numpart)=itra0(1:numpart)
+!   print *,'special restart from sav_init'
+!   return
+! endif
  !##################################### 
  
  doyy: do yy=year_b,year_e  
