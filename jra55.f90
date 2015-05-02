@@ -277,6 +277,7 @@ end subroutine alloc_jra55
   xlast=xaux2
   dx=xaux3
   dx=0.5625_dp ! correcting inaccurate value read from file
+  dxconst=180._dp/(dx*r_earth*pi)
   if (xlon0 > 180._dp) xlon0=xlon0-360._dp
   print *,'xlon0 xlast dx ',xlon0,xlast,dx
   call grib_get_real4(igrib,'latitudeOfFirstGridPointInDegrees',yfirst,iret)
@@ -314,6 +315,7 @@ end subroutine alloc_jra55
   NbHLat=NbLat/2
   ylat0 = min(yfirst,ylast)+0.001
   dy=2*abs(ylat0)/(NbLat-1)
+  dyconst=180._dp/(dy*r_earth*pi)
   print *,'ylat0 dy ',ylat0,dy
   ! Calculate the Gaussian grid
   allocate(y_gauss(NbHLat),w_gauss(NbHLat),ylat_gauss(NbLat))
@@ -351,7 +353,7 @@ end subroutine alloc_jra55
     sglobal=.true.
     ! Enhance the map scale by factor 3 (*2=6) compared to north-south
     ! map scale
-    sizesouth=6.*(switchsouth+90._dp)/dy
+    sizesouth=6._dp*(switchsouth+90._dp)/dy
     call stlmbr(southpolemap,-90._dp,0._dp)
     call stcm2p(southpolemap,0._dp,0._dp,switchsouth,0._dp,sizesouth, &
     sizesouth,switchsouth,180._dp)
@@ -366,7 +368,7 @@ end subroutine alloc_jra55
     nglobal=.true.
     ! Enhance the map scale by factor 3 (*2=6) compared to north-south
     ! map scale
-    sizenorth=6.*(90._dp-switchnorth)/dy
+    sizenorth=6._dp*(90._dp-switchnorth)/dy
     call stlmbr(northpolemap,90._dp,0._dp)
     call stcm2p(northpolemap,0._dp,0._dp,switchnorth,0._dp,sizenorth, &
     sizenorth,switchnorth,180._dp)
@@ -1210,6 +1212,8 @@ end subroutine alloc_jra55
   sigma(:,:,nuvz)=pmc_jra55(nuvz)/(theta(:,:,nuvz)-theta(:,:,nuvz-1))
   
 ! Calculation of the mass flux across the surface
+! Note that mean_sigma is not a mean of sigma but the spherical
+! integral of sigma (that divides the flux to get the correction)
   allocate(flux(0:nx-1,0:ny-1))
   allocate(flux_lat(0:ny-1))
   allocate(mean_sigma_lat(0:ny-1))
@@ -1223,12 +1227,13 @@ end subroutine alloc_jra55
      mean_w(k)=mass_flux(k)/mean_sigma(k)
   enddo
 !$OMP END DO
-  deallocate(flux,flux_lat)
+  deallocate(flux,flux_lat,mean_sigma_lat)
 !$OMP END PARALLEL 
 
-! Output of the ass averaged diab heating
+! Output of the averaged diab heating
   if(mean_diab_output) then
-    write(unitflux) memtime_diab(m),mean_w(nuvz-NPureP_jra55+1:nuvz)
+    write(unitflux) memtime_diab(m),mean_w(nuvz-NPureP_jra55+1:nuvz), &
+                                    mean_sigma(nuvz-NPureP_jra55+1:nuvz)
     flush(unitflux)
   endif
 
@@ -1239,7 +1244,7 @@ end subroutine alloc_jra55
   enddo
 !$OMP END PARALLEL DO
 
-  deallocate(theta,sigma,mean_sigma,mean_sigma_lat)
+  deallocate(theta,sigma,mean_sigma)
   deallocate(mass_flux,mean_w)
 
   return
@@ -1297,6 +1302,7 @@ end subroutine alloc_jra55
   enddo
 
 ! Create the output file of the mas averaged heating flux
+! or open it in the append mode
   open(unitflux,file=trim(path(2))//'MassMeanDiab2.dat',form='unformatted',position='append')
 
   return
