@@ -212,27 +212,27 @@ end subroutine alloc_merra
   xglobal=.true.
   dx=grid_lon(2)-grid_lon(1)
   dy=grid_lat(2)-grid_lat(1)
-  dxconst=180./(dx*r_earth*pi)
-  dyconst=180./(dy*r_earth*pi)
+  dxconst=180._dp/(dx*r_earth*pi)
+  dyconst=180._dp/(dy*r_earth*pi)
   zmax=LogPressLev(NbPress)
 ! CHECK WHAT IT GOING ON BELOW
 ! Imposes south pole
   sglobal=.true.               ! field contains south pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizesouth=6.*(switchsouth+90.)/dy
-  call stlmbr(southpolemap,-90.,0.)
-  call stcm2p(southpolemap,0.,0.,switchsouth,0.,sizesouth, &
-  sizesouth,switchsouth,180.)
+  sizesouth=6._dp*(switchsouth+90._dp)/dy
+  call stlmbr(southpolemap,-90._dp,0._dp)
+  call stcm2p(southpolemap,0._dp,0.,switchsouth,0._dp,sizesouth, &
+  sizesouth,switchsouth,180._dp)
   switchsouthg=(switchsouth-ylat0)/dy
 ! Imposes north pole
   nglobal=.true.               ! field contains north pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizenorth=6.*(90.-switchnorth)/dy
-  call stlmbr(northpolemap,90.,0.)
-  call stcm2p(northpolemap,0.,0.,switchnorth,0.,sizenorth, &
-  sizenorth,switchnorth,180.)
+  sizenorth=6._dp*(90._dp-switchnorth)/dy
+  call stlmbr(northpolemap,90._dp,0._dp)
+  call stcm2p(northpolemap,0._dp,0._dp,switchnorth,0._dp,sizenorth, &
+  sizenorth,switchnorth,180._dp)
   switchnorthg=(switchnorth-ylat0)/dy
   write(*,*)
   write(*,'(a,2i5,3L3)')' gribcheck_merra> nx,ny,xglobal,nglobal,sglobal ', &
