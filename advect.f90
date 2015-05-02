@@ -409,10 +409,14 @@ contains
 
         ! TEST!
          !if(mod(j,833)==0 ) then
+         ! if(j==6858 .or. j==7501 .or. j==13302 .or. j==13783 .or. j==84788 .or. j==86705 &
+         !   .or. j==91502 .or. j==93120 .or. j==105847) then
          !  debug_out=.true.
          !else 
          !  debug_out=.false.
          !endif
+         
+
 
 ! If integration step is due, do it
 !==================================
@@ -468,8 +472,10 @@ contains
                 z_kill(j)=ztra1(j)
               endif
               if (track_cross) then
-                if(ztra1(j)>1800 .and. it_1800(j)==0) it_1800(j)=0
-                if(ztra1(j)>2300 .and. it_2300(j)==0) it_2300(j)=0
+! In the previous erroneous setting it_1800 and it_2300 were set to zero
+! which made cross files not exploitable
+                if(ztra1(j)>1800 .and. it_1800(j)==0) it_1800(j)=itime
+                if(ztra1(j)>2300 .and. it_2300(j)==0) it_2300(j)=itime
               endif                       
             endif
 
@@ -521,7 +527,7 @@ contains
 
         if (mod(itime,loutprint)==0) then
           call system_clock(count_clock_2,count_rate,count_max)        
-          write(*,'(a,i9,i6,f10.2,a)') ' timemanager> npproc*, bounce, cpu ',&
+          write(*,'(a,i9,i9,f10.2,a)') ' timemanager> npproc*, bounce, cpu ',&
              npproc, nb_bounce, float(count_clock_2-count_clock_1)/       &
              float(count_rate), 's'
           write(*,'(a,7i8)') ' timemanager> npstop ',npstop
@@ -657,7 +663,7 @@ contains
 !            if(debug_out) print *,'advanceB (u,v,w)> ',u,v,w*86400  ! test
         else
           call interpol_wind_theta_diab (itime,x,y, z, & 
-            u,v,w, ngrid, theta_inf, theta_sup, z_factor,tint,nstop)
+            u,v,w, ngrid, theta_inf, theta_sup, z_factor,tint,nstop,jp)
 !            if(debug_out) print *,'advanceB (u,v,w)> ',u,v,w*86400  ! test
         endif
       elseif (merra_data) then
