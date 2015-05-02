@@ -150,10 +150,6 @@
       if (merra_diab.and.mass_correction) call diab_mass_merra_init
       if (jra55_diab.and.mass_correction) call diab_mass_jra55_init
 
-! Allocate the 3D fields
-!***********************
-      call alloc_3D
-
 ! Read the parameters of the release plan defined in COMMAND
 !***********************************************************
 ! Release plan is selected in readreleasesB2
@@ -165,6 +161,11 @@
         print *,'randomly perturbed experiment'
         call random_seed()
       endif
+      
+! Allocate the 3D fields
+!***********************
+      call alloc_3D      
+      
 
 ! Fix the release times and release positions of all particles
 !*************************************************************
