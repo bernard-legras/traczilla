@@ -964,7 +964,7 @@ end subroutine alloc_ecmwf_diab
 
 subroutine interpol_wind_theta_diab   &
          (itime,xt,yt, ztheta, dxdt,dydt,dzdt, ngrid, theta_inf, theta_sup, & 
-          z_factor,tint,nstop)
+          z_factor,tint,nstop,j)
 
 !*******************************************************************************
 !                                                                              *
@@ -1001,6 +1001,7 @@ subroutine interpol_wind_theta_diab   &
 
       integer, intent(in) :: itime,ngrid
       integer, intent(inout):: nstop
+      integer, intent(in):: j
       real(dp), intent(in) :: xt,yt,ztheta
       real(dp), intent(out) :: dxdt,dydt,dzdt,z_factor,tint, theta_inf, theta_sup
 
@@ -1109,6 +1110,33 @@ subroutine interpol_wind_theta_diab   &
 !  Patch to avoid extrapolations at top and bottom of the domain     
       theta = max(theta,maxval(tr))
       theta = min(theta,minval(trp))
+      
+!      if(debug_out) then
+!        print *,'interpol'
+!        write(*,'("j, lon, lat, theta ",I7,3 F8.2)')j,xlon0+dx*xt,ylat0+dy*yt,theta
+!        write(*,'("indz  ",8I4)')indz
+!        write(*,'("tr    ",8F8.2)')tr
+!        write(*,'("theta_g(1) ",6F8.2)') theta_g(indz(1,1)-2,ix,jy,memind(1)),&
+!         theta_g(indz(1,1)-1,ix,jy,memind(1)),theta_g(indz(1,1),ix,jy,memind(1)),& 
+!         theta_g(indz(1,1)+1,ix,jy,memind(1)),theta_g(indz(1,1)+2,ix,jy,memind(1)),&
+!         theta_g(indz(1,1)+3,ix,jy,memind(1))
+!        write(*,'("tth(1)     ",6F8.2)') tth(ix,jy,indz(1,1)-2,memind(1)),&
+!         tth(ix,jy,indz(1,1)-1,memind(1)),tth(ix,jy,indz(1,1),memind(1)),& 
+!         tth(ix,jy,indz(1,1)+1,memind(1)),tth(ix,jy,indz(1,1)+2,memind(1)),&
+!         tth(ix,jy,indz(1,1)+3,memind(1))
+!        write(*,'("pres(1)    ",6F8.0)') akz(indz(1,1)-2)+bkz(indz(1,1)-2)*ps(ix,jy,1,memind(1)),&
+!                                         akz(indz(1,1)-1)+bkz(indz(1,1)-1)*ps(ix,jy,1,memind(1)),&
+!                                         akz(indz(1,1)  )+bkz(indz(1,1)  )*ps(ix,jy,1,memind(1)),&
+!                                         akz(indz(1,1)+1)+bkz(indz(1,1)+1)*ps(ix,jy,1,memind(1)),&
+!                                         akz(indz(1,1)+2)+bkz(indz(1,1)+2)*ps(ix,jy,1,memind(1)),&
+!                                         akz(indz(1,1)+3)+bkz(indz(1,1)+3)*ps(ix,jy,1,memind(1)) 
+!        write(*,'("pres(1)rec ",6F8.0)') p0*(tth(ix,jy,indz(1,1)-2,memind(1))/theta_g(indz(1,1)-2,ix,jy,memind(1)))**(1/kappa),&
+!                                         p0*(tth(ix,jy,indz(1,1)-1,memind(1))/theta_g(indz(1,1)-1,ix,jy,memind(1)))**(1/kappa),&
+!                                         p0*(tth(ix,jy,indz(1,1)  ,memind(1))/theta_g(indz(1,1)  ,ix,jy,memind(1)))**(1/kappa),&
+!                                         p0*(tth(ix,jy,indz(1,1)+1,memind(1))/theta_g(indz(1,1)+1,ix,jy,memind(1)))**(1/kappa),&
+!                                         p0*(tth(ix,jy,indz(1,1)+2,memind(1))/theta_g(indz(1,1)+2,ix,jy,memind(1)))**(1/kappa),&
+!                                         p0*(tth(ix,jy,indz(1,1)+3,memind(1))/theta_g(indz(1,1)+3,ix,jy,memind(1)))**(1/kappa)             
+!      endif
 
 ! Provides upper and lower theta bounds
 !**************************************
@@ -1456,6 +1484,7 @@ subroutine interpol_wind_theta_diab   &
       dydt=v1(1)*dt2+v1(2)*dt1
       dzdt=w1(1)*dt2_diab+w1(2)*dt1_diab
       if(AccurateTemp) tint=tp1(1)*dt2+tp1(2)*dt1
+      !if(debug_out) write(*,"('j tint p ',I7,F8.2,F8.0)")j,tint,p0*(tint/theta)**(1/kappa)
       !if(debug_out) &
       ! print "('interpol>',i3,' P ',3f7.0,' T ',3f7.2,' TH ',3f7.2)", & ! test
       !   indz(1,1),p0*(theta/tint)**(-1/kappa),&
