@@ -101,7 +101,7 @@ module commons
 !*********************************************
 
 !     parameter(nxmax=361,nymax=181,nuvzmax=51,nwzmax=51) ! 1 degree 51 levels
-      integer, parameter :: nxmax=361,nymax=181,nuvzmax=92,nwzmax=92 ! 1 degree 92 levels
+      integer, parameter :: nxmax=721,nymax=361,nuvzmax=138,nwzmax=138 ! 1/2 degree 138 levels
 !     parameter(nxmax=721,nymax=181,nuvzmax=61,nwzmax=61) ! 1/2 degre 61 levels
 
 
@@ -126,7 +126,7 @@ module commons
 ! Maximum number of particles, species, wind fields and similar
 !**************************************************************
 
-      integer, parameter :: maxpart=30000000,maxpoint=50,maxspec=1
+      integer, parameter :: maxpart=20000000,maxpoint=50,maxspec=1
 !     integer, parameter :: maxpart=3000000,maxpoint=50,maxspec=1
       integer, parameter :: maxwf=150000,maxtable=1000,numclass=9,ni=11
 
@@ -299,7 +299,7 @@ module commons
       integer :: curtain_type
       real (dp) :: lev1,lev2,inclev
       real (dp) :: uppertheta
-      real (dp) :: pcut,thetacut, thetalowcut
+      real (dp) :: pcut, plowcut, thetacut, thetalowcut
       
       integer :: npart(maxpoint)
       character(len=12):: release_plan
@@ -313,7 +313,7 @@ module commons
 ! numpoint                actual number of trajectory starting/ending points
 ! ireleasestart,ireleaseend [s] starting and ending time of each release
 ! ireleaseinterval        interval between successive release [s]
-! release_plan	L	  type of release method
+! release_plan	L	      type of release method
 ! xmass                   total mass emitted
 ! xpoint1,ypoint1         lower left coordinates of release area
 ! xpoint2,ypoint2         upper right coordinates of release area
@@ -401,20 +401,20 @@ module commons
 !****************************************************************************
 ! Variables defining actual size and geographical location of the wind fields
 !****************************************************************************
-      integer nx,ny,nxfield,nuvz,nwz,nz,nmixz,nlev_ec
+      integer :: nx,ny,nxfield,nuvz_b,nuvz,nwz_b,nwz,nmixz,nlev_ec
+      logical :: u_bot, w_top
       real(dp) :: dx,dy,xlon0,ylat0,dxconst,dyconst,zmax
 
-! nx,ny,nz  L             actual dimensions of wind fields in x,y and z
-!                         direction, respectively
-! nuvz,nwz  L             vertical dimension of original ECMWF data
+! nx,ny,nz  L             actual dimensions of wind fields in x, y and z
+!                         directions, respectively
+! nuvz_b:nuvz L           vertical dimension of original ECMWF data for u,v,T
+! nwz_b:nwz   L           vertical dimension of original ECMWF data for w
 ! nxfield                 same as nx for limited area fields,
 !                         but for global fields nx=nxfield+1
 ! nmixz                   number of levels up to maximum PBL height (3500 m)
-
+ 
 ! nuvz is used for u,v components
 ! nwz is used for w components (staggered grid)
-! nz is used for the levels in transformed coordinates (terrain-following 
-! Cartesian coordinates)
 
 ! nlev_ec  L              number of levels ECMWF model
 ! dx       L              grid distance in x direction
@@ -488,8 +488,15 @@ module commons
       integer                ::  iedate_Claus, ietime_Claus
       logical                ::  diabatic_Claus, CLAUSactiv
       integer                ::  TB_max
-      integer                ::  latmin_Claus
-      integer                ::  latmax_Claus
+      integer                ::  latmin_Claus, latmax_Claus
+       
+!**************************************
+! Variables associated with StratoClim
+!**************************************
+      integer, parameter     ::  unitStratoClim = 86
+      character(len=100)     ::  TBStratoClim_dir
+      logical                ::  diabatic_StratoClim, StratoClimactiv
+      integer                ::  fulldate_cloudtop  					      
 
 !************************************************
 ! Variables associated with parcel kill and cross
