@@ -27,6 +27,7 @@ use commons
 implicit none
 private :: locuv, locuv2, locw, locw2
 private :: check_nx, check_ny, check_nuvz, check_nwz, printerror
+logical, save :: ecmwf_data
 
 contains
 !===============================================================================
@@ -73,7 +74,7 @@ contains
         read(unitpath,'(a)',err=998) path(i) 
         len_path(i)=len_trim(path(i))
       enddo
-
+ 
       close(unitpath)
       return    
 
@@ -1021,7 +1022,7 @@ print *,path(3)(1:len_path(3))//trim(wfname(ifn))
         do j=0,ny-1 ; do i=0,nxfield-1
            ps(i,j,1,n) = zsec4(nxfield*(ny-j-1)+i+1)
         enddo       ; enddo            
-      case (141)              !! SNOW DEPTH
+!      case (141)              !! SNOW DEPTH
 !        do j=0,ny-1 ; do i=0,nxfield-1
 !           sd(i,j,1,n) = zsec4(nxfield*(ny-j-1)+i+1)
 !        enddo       ; enddo
