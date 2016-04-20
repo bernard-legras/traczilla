@@ -590,7 +590,7 @@ end subroutine alloc_jra55
 ! Check, if heating rate fields are available for the current time step
 !**************************************************************
 
-      if (jra55_diab) then
+      ifdiab: if (jra55_diab) then
 
         if ((ldirect*wftime_diab(1).gt.ldirect*itime).or.    &
             (ldirect*wftime_diab(numbwf_diab).lt.ldirect*itime)) then
@@ -603,15 +603,15 @@ end subroutine alloc_jra55
           return
         endif
 
-        if ((ldirect*memtime_diab(1).le.ldirect*itime).and.   &
-            (ldirect*memtime_diab(2).gt.ldirect*itime)) then
+        ifread: if ((ldirect*memtime_diab(1).le.ldirect*itime).and.   &
+                    (ldirect*memtime_diab(2).gt.ldirect*itime)) then
 
 ! The right wind fields are already in memory -> don't do anything
 !*****************************************************************
           continue
 
         else if ((ldirect*memtime_diab(2).le.ldirect*itime).and. &
-           (memtime_diab(2).ne.999999999)) then
+           (memtime_diab(2).ne.999999999)) then ifread
  
 ! Current time is after 2nd wind field
 ! -> Resort wind field pointers, so that current time is between 1st and 2nd
@@ -640,7 +640,7 @@ end subroutine alloc_jra55
           enddo
  45       indmin_diab=indj
 
-        else
+        else ifread
 
 ! No wind fields, which can be used, are currently in memory 
 ! -> read both wind fields
@@ -671,13 +671,18 @@ end subroutine alloc_jra55
            enddo
  65        indmin_diab=indj
 
-        endif
+        endif ifread
 
         lwindinterv=abs(memtime_diab(2)-memtime_diab(1))
  
         if (lwindinterv.gt.idiffmax) nstop=3
+ 
+ !    if z_motion, set memind_diab to memind for correct
+ !    indexing of vertical velocities in the interpolation routine     
+      else if (z_motion) then ifdiab
+         memind_diab=memind         
       
-      endif
+      endif ifdiab
 
       return
       end subroutine getfields_jra55
@@ -1187,15 +1192,18 @@ end subroutine alloc_jra55
 !*******************************************************************************
 
   integer, intent(in) :: n,m
-  real(dp), allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:), flux_lat(:)
-  real(dp), allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:)
+  real(dp), allocatable :: theta(:,:,:), sigma(:,:,:), flux(:,:,:), flux_lat(:,:)
+  real(dp), allocatable :: mass_flux(:), mean_sigma(:), mean_sigma_lat(:,:)
   real(dp), allocatable :: mean_w(:)
   integer :: k
 
   allocate(theta(0:nx-1,0:ny-1,nuvz),sigma(0:nx-1,0:ny-1,nuvz))
   allocate(mean_sigma(nuvz),mass_flux(nuvz),mean_w(nuvz))
+  allocate(flux(0:nx-1,0:ny-1,nuvz))
+  allocate(flux_lat(0:ny-1,nuvz))
+  allocate(mean_sigma_lat(0:ny-1,nuvz))
   
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(mean_sigma_lat,flux,flux_lat)
+!$OMP PARALLEL DEFAULT(SHARED)
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
 ! Calculation of the potential temperature
   do k=nuvz-NPureP_jra55,nuvz
@@ -1214,21 +1222,22 @@ end subroutine alloc_jra55
 ! Calculation of the mass flux across the surface
 ! Note that mean_sigma is not a mean of sigma but the spherical
 ! integral of sigma (that divides the flux to get the correction)
-  allocate(flux(0:nx-1,0:ny-1))
-  allocate(flux_lat(0:ny-1))
-  allocate(mean_sigma_lat(0:ny-1))
+  !allocate(flux(0:nx-1,0:ny-1))
+  !allocate(flux_lat(0:ny-1))
+  !allocate(mean_sigma_lat(0:ny-1))
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
   do k=nuvz-NPureP_jra55+1,nuvz
-     flux(:,:)=wwh(:,:,k,n)*sigma(:,:,k)
-     flux_lat(:)=sum(flux(0:nx-2,:),DIM=1)
-     mean_sigma_lat(:)=sum(sigma(0:nx-2,:,k),DIM=1)
-     mass_flux(k)=0.5*dot_product(flux_lat(:),area_coefft_jra55)
-     mean_sigma(k)=0.5*dot_product(mean_sigma_lat(:),area_coefft_jra55)
+     flux(:,:,k)=wwh(:,:,k,n)*sigma(:,:,k)
+     flux_lat(:,k)=sum(flux(0:nx-2,:,k),DIM=1)
+     mean_sigma_lat(:,k)=sum(sigma(0:nx-2,:,k),DIM=1)
+     mass_flux(k)=0.5*dot_product(flux_lat(:,k),area_coefft_jra55)
+     mean_sigma(k)=0.5*dot_product(mean_sigma_lat(:,k),area_coefft_jra55)
      mean_w(k)=mass_flux(k)/mean_sigma(k)
   enddo
 !$OMP END DO
-  deallocate(flux,flux_lat,mean_sigma_lat)
-!$OMP END PARALLEL 
+  !deallocate(flux,flux_lat,mean_sigma_lat)
+!$OMP END PARALLEL
+  deallocate(flux,flux_lat,mean_sigma_lat) 
 
 ! Output of the averaged diab heating
   if(mean_diab_output) then
@@ -1260,7 +1269,7 @@ end subroutine alloc_jra55
 ! and sin(phi + dphi) - sin(phi - dphi) = 2 sin(dphi) cos(phi) for the surface integral
 ! where phi si a grid latitude and dphi=0.5*dy. This quantity is the diffference 
 ! (up to factor 2 pi which is not accounted) of area
-! between to caps bouded by phi-dphi and phi+dphi latitudes. The first and last values 
+! between two caps bounded by phi-dphi and phi+dphi latitudes. The first and last values 
 ! are the area of polar caps of angle dphi/2, that is 2 sin^2(dphi/4)
 ! Conversion to radian is applied
 !*************************************************************************************
@@ -1322,21 +1331,32 @@ subroutine interpol_wind_jra55 &
 !    Author: B. Legras (derived from original interpol_wind)                   *
 !                                                                              *
 !    The interpolation is performed in eta coordinates which are linked to     *
-!    model data                                                                *
-!
+!    model data
+!    This routine is intended to be used as a universal diabatic interpolator  *
+!    to be used for ERA-Interim and JRA-55 diabatic cases (no INC)
+!    and for JRA-55 z cases
+!    It cannot be used for ERA-Interim z case because the w grid is shifted 
+!    in the vertical, but in this case the interpolation is anyway done
+!    in log pressure
+!    It cannot be used for MERRA because the vertical grid is in pressure 
 !                                                                              *
 !*******************************************************************************
 !                                                                              *
 ! Variables:                                                                   *
 ! dxdt,dydt          horizontal wind components in grid units per second       *
 ! itime [s]          current temporal position                                 *
-! memtime(3) [s]     times of the wind fields in memory                        *
-! xt,yt,theta        coordinates position for which wind data shall be calculat*
+! memtime(2) [s]     times of the wind fields in memory
+! memind(2)          indexes of the wind fields in memory                      *
+! memtime_diab(2)[s] times of the diabatic fields in memory
+! memind(2)          indexes of the diabatic fields in memory      
+! xt,yt,zt           coordinates position for which wind data shall be         *
+!                    interpolated. zt can be theta or -log(p/p0)
 !                                                                              *
 ! Constants:                                                                   *
 !                                                                              *
 !*******************************************************************************
 
+      use ecmwf_diab, only : ecmwf_diabatic_w
       integer, intent(in) :: itime,ngrid
       integer, intent(inout):: nstop
       real(dp), intent(in) :: xt,yt,zt
@@ -1347,10 +1367,10 @@ subroutine interpol_wind_jra55 &
 
 ! Auxiliary variables needed for interpolation
       real(dp) :: press, siglog, etalog, siglogr, siglogrp 
-      real(dp) :: u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2),dt1_diab,dt2_diab,dtt_diab
+      real(dp) :: u1(2),v1(2),w1(2),dt1,dt2,dtt,tp1(2),dt1_w,dt2_w,dtt_w
       real(dp) :: fup,fbot,u(4,2),v(4,2),w(4,2),tp(4,2)
       integer :: m,indexh,indexh_diab,indz
-      integer :: ix,jy,ixp,jyp
+      integer :: ix,jy
       real(dp) :: ddx,ddy,rddx,rddy,p1,p2,p3,p4
 
 !********************************************
@@ -1360,13 +1380,16 @@ subroutine interpol_wind_jra55 &
 ! Determine the lower left corner and its distance to the current position
 !*************************************************************************
 
+      ! This section depends on the reanalysis because of the variations
+      ! in the latitude grid
       ! min and max required for the points just falling on the boundary
       ! as it may happen typically as a result of initialization
+      
       if(xglobal) ix=modulo(floor(xt),nx-1)       
       jy=max(min(floor(yt),ny-1),-1)
-      ixp=ix+1         ;  jyp=jy+1
       ddx=modulo(xt-float(ix),1.)
-      ! accounts for the two polar regions
+      ! accounts for the two polar regions in JRA55
+      ! the case should not occur for EI since 0 <= yt <= ny-1
       if (yt<0) then
          ddy=yt/(90._dp/dy-ny/2)+1._dp
       else if (yt>ny-1) then
@@ -1386,22 +1409,26 @@ subroutine interpol_wind_jra55 &
       dtt=1./(dt1+dt2)
       dt1=dt1*dtt
       dt2=dt2*dtt
-      if (jra55_diab) then
-        dt1_diab=float(itime-memtime_diab(1))
-        dt2_diab=float(memtime_diab(2)-itime) 
-        dtt_diab=1/(dt1_diab+dt2_diab)
-        dt1_diab=dt1_diab*dtt_diab
-        dt2_diab=dt2_diab*dtt_diab
+      if (jra55_diab.or.ecmwf_diabatic_w) then
+        dt1_w=float(itime-memtime_diab(1))
+        dt2_w=float(memtime_diab(2)-itime) 
+        dtt_w=1/(dt1_w+dt2_w)
+        dt1_w=dt1_w*dtt_w
+        dt2_w=dt2_w*dtt_w
+      else
+        dt1_w=dt1
+        dt2_w=dt2
+!       memind_diab should be set to memind in getfields
       endif
  
-! Determine the log pressure and the vertical location
-!*******************************************************
+! Determine the pressure and localize the parcel in the vertical grid
+!********************************************************************
 
 !  z pressure coordinates
       if (z_motion) then       
         press=p0*exp(-zt)
 !  theta coordinates       
-      else if (jra55_diab) then
+      else if (jra55_diab.or.ecmwf_diabatic_w) then
         !if (tint <=0) then
         !  print *,'tint < 0 ',tint,ix,jy,zt
         !endif
@@ -1416,23 +1443,23 @@ subroutine interpol_wind_jra55 &
       
 
 ! surface pressure under the parcel at the required time (in Pascal)
-      psaver=dt2*(p1*ps(ix,jy,1,memind(1))+p2*ps(ixp,jy,1,memind(1))    &
-                   +p3*ps(ix,jyp,1,memind(1))+p4*ps(ixp,jyp,1,memind(1))) &
-            +dt1*(p1*ps(ix,jy,1,memind(2))+p2*ps(ixp,jy,1,memind(2))    &
-                   +p3*ps(ix,jyp,1,memind(2))+p4*ps(ixp,jyp,1,memind(2)))
+      psaver=dt2*(p1*ps(ix,jy,1,memind(1))+p2*ps(ix+1,jy,1,memind(1))    &
+                   +p3*ps(ix,jy+1,1,memind(1))+p4*ps(ix+1,jy+1,1,memind(1))) &
+            +dt1*(p1*ps(ix,jy,1,memind(2))+p2*ps(ix+1,jy,1,memind(2))    &
+                   +p3*ps(ix,jy+1,1,memind(2))+p4*ps(ix+1,jy+1,1,memind(2)))
                    
       if(theta_bounds) then
         theta_inf=280._dp  ! test value always less than minimum ztra1 
-                           ! to avoid unecessary calculationq<qz
+                           ! to avoid unecessary calculation
                  
         theta_sup = ((tth(ix, jy, upper_theta_level,memind(1))*p1 &
-                    + tth(ix, jyp,upper_theta_level,memind(1))*p2 &
-                    + tth(ixp,jy, upper_theta_level,memind(1))*p3 &
-                    + tth(ixp,jyp,upper_theta_level,memind(1))*p4)*dt1 &
+                    + tth(ix, jy+1,upper_theta_level,memind(1))*p2 &
+                    + tth(ix+1,jy, upper_theta_level,memind(1))*p3 &
+                    + tth(ix+1,jy+1,upper_theta_level,memind(1))*p4)*dt2 &
                    + (tth(ix, jy, upper_theta_level,memind(2))*p1 &
-                    + tth(ix, jyp,upper_theta_level,memind(2))*p2 &
-                    + tth(ixp,jy, upper_theta_level,memind(2))*p3 &
-                    + tth(ixp,jyp,upper_theta_level,memind(2))*p4)*dt2) &
+                    + tth(ix, jy+1,upper_theta_level,memind(2))*p2 &
+                    + tth(ix+1,jy, upper_theta_level,memind(2))*p3 &
+                    + tth(ix+1,jy+1,upper_theta_level,memind(2))*p4)*dt1) &
                    * (p0/akz(upper_theta_level))**kappa
       endif
 
@@ -1460,12 +1487,12 @@ subroutine interpol_wind_jra55 &
             +0.5_dp*(2*siglog-siglogr-siglogrp)/(siglogr-siglogrp) &
                    *(etakzlog(indz)-etakzlog(indz+1))
                    
-! Calculate factors of bilinear interpolation
+! Calculate factors of bilinear interpolation as they are common 
+! to all elements
 
       fbot=(etalog-etakzlog(indz+1))/(etakzlog(indz)-etakzlog(indz+1))
       fup=(etakzlog(indz)-etalog)/(etakzlog(indz)-etakzlog(indz+1)) 
-                       
-
+                     
 !**********************************************************************
 ! 1.) Bilinear horizontal interpolation
 ! This has to be done separately for 4 fields (Temporal(2)*Vertical(2))
@@ -1480,30 +1507,30 @@ subroutine interpol_wind_jra55 &
           indexh=memind(m)
           indexh_diab=memind_diab(m)
             
-            u(1,m)=uupol(ix ,jy ,indz  ,indexh)*fbot  &
-                  + uupol(ix ,jy ,indz+1,indexh)*fup  
-            v(1,m)=vvpol(ix ,jy ,indz  ,indexh)*fbot  &
-                  + vvpol(ix ,jy ,indz+1,indexh)*fup  
-            w(1,m)=wwh(ix ,jy ,indz  ,indexh_diab)*fbot  &
-                  + wwh(ix ,jy ,indz+1,indexh_diab)*fup 
-            u(2,m)=uupol(ixp,jy ,indz  ,indexh)*fbot  &
-                  + uupol(ixp,jy ,indz+1,indexh)*fup 
-            v(2,m)=vvpol(ixp,jy ,indz  ,indexh)*fbot  &
-                  + vvpol(ixp,jy ,indz+1,indexh)*fup
-            w(2,m)=wwh(ixp,jy ,indz  ,indexh_diab)*fbot &
-                  + wwh(ixp,jy ,indz+1,indexh_diab)*fup
-            u(3,m)=uupol(ix ,jyp,indz  ,indexh)*fbot &
-                  + uupol(ix ,jyp,indz+1,indexh)*fup
-            v(3,m)=vvpol(ix ,jyp,indz  ,indexh)*fbot &
-                  + vvpol(ix ,jyp,indz+1,indexh)*fup
-            w(3,m)=wwh(ix ,jyp,indz  ,indexh_diab)*fbot  &
-                  + wwh(ix ,jyp,indz+1,indexh_diab)*fup
-            u(4,m)=uupol(ixp,jyp,indz  ,indexh)*fbot &
-                  + uupol(ixp,jyp,indz+1,indexh)*fup
-            v(4,m)=vvpol(ixp,jyp,indz  ,indexh)*fbot &
-                  + vvpol(ixp,jyp,indz+1,indexh)*fup
-            w(4,m)=wwh(ixp,jyp,indz  ,indexh_diab)*fbot  &
-                  + wwh(ixp,jyp,indz+1,indexh_diab)*fup
+          u(1,m)=uupol(ix ,jy ,indz  ,indexh)*fbot  &
+                + uupol(ix ,jy ,indz+1,indexh)*fup  
+          v(1,m)=vvpol(ix ,jy ,indz  ,indexh)*fbot  &
+                + vvpol(ix ,jy ,indz+1,indexh)*fup  
+          w(1,m)=wwh(ix ,jy ,indz  ,indexh_diab)*fbot  &
+                + wwh(ix ,jy ,indz+1,indexh_diab)*fup 
+          u(2,m)=uupol(ix+1,jy ,indz  ,indexh)*fbot  &
+                + uupol(ix+1,jy ,indz+1,indexh)*fup 
+          v(2,m)=vvpol(ix+1,jy ,indz  ,indexh)*fbot  &
+                + vvpol(ix+1,jy ,indz+1,indexh)*fup
+          w(2,m)=wwh(ix+1,jy ,indz  ,indexh_diab)*fbot &
+                + wwh(ix+1,jy ,indz+1,indexh_diab)*fup
+          u(3,m)=uupol(ix ,jy+1,indz  ,indexh)*fbot &
+                + uupol(ix ,jy+1,indz+1,indexh)*fup
+          v(3,m)=vvpol(ix ,jy+1,indz  ,indexh)*fbot &
+                + vvpol(ix ,jy+1,indz+1,indexh)*fup
+          w(3,m)=wwh(ix ,jy+1,indz  ,indexh_diab)*fbot  &
+                + wwh(ix ,jy+1,indz+1,indexh_diab)*fup
+          u(4,m)=uupol(ix+1,jy+1,indz  ,indexh)*fbot &
+                + uupol(ix+1,jy+1,indz+1,indexh)*fup
+          v(4,m)=vvpol(ix+1,jy+1,indz  ,indexh)*fbot &
+                + vvpol(ix+1,jy+1,indz+1,indexh)*fup
+          w(4,m)=wwh(ix+1,jy+1,indz  ,indexh_diab)*fbot  &
+                + wwh(ix+1,jy+1,indz+1,indexh_diab)*fup
           
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
           v1(m)=p1*v(1,m)+p2*v(2,m)+p3*v(3,m)+p4*v(4,m)
@@ -1517,30 +1544,30 @@ subroutine interpol_wind_jra55 &
           indexh=memind(m)
           indexh_diab=memind_diab(m)
 
-            u(1,m)=uuh(ix ,jy ,indz  ,indexh)*fbot &
-                  + uuh(ix ,jy ,indz+1,indexh)*fup
-            v(1,m)=vvh(ix ,jy ,indz  ,indexh)*fbot &
-                  + vvh(ix ,jy ,indz+1,indexh)*fup
-            w(1,m)=wwh(ix ,jy ,indz  ,indexh_diab)*fbot &
-                  + wwh(ix ,jy ,indz+1,indexh_diab)*fup
-            u(2,m)=uuh(ixp,jy ,indz  ,indexh)*fbot &
-                  + uuh(ixp,jy ,indz+1,indexh)*fup
-            v(2,m)=vvh(ixp,jy ,indz  ,indexh)*fbot &
-                  + vvh(ixp,jy ,indz+1,indexh)*fup
-            w(2,m)=wwh(ixp,jy ,indz  ,indexh_diab)*fbot&
-                  + wwh(ixp,jy ,indz+1,indexh_diab)*fup
-            u(3,m)=uuh(ix ,jyp,indz  ,indexh)*fbot &
-                  + uuh(ix ,jyp,indz+1,indexh)*fup
-            v(3,m)=vvh(ix ,jyp,indz  ,indexh)*fbot &
-                  + vvh(ix ,jyp,indz+1,indexh)*fup
-            w(3,m)=wwh(ix ,jyp,indz  ,indexh_diab)*fbot &
-                  + wwh(ix ,jyp,indz+1,indexh_diab)*fup
-            u(4,m)=uuh(ixp,jyp,indz  ,indexh)*fbot &
-                  + uuh(ixp,jyp,indz+1,indexh)*fup
-            v(4,m)=vvh(ixp,jyp,indz  ,indexh)*fbot &
-                  + vvh(ixp,jyp,indz+1,indexh)*fup
-            w(4,m)=wwh(ixp,jyp,indz  ,indexh_diab)*fbot &
-                  + wwh(ixp,jyp,indz+1,indexh_diab)*fup
+          u(1,m)=uuh(ix ,jy ,indz  ,indexh)*fbot &
+                + uuh(ix ,jy ,indz+1,indexh)*fup
+          v(1,m)=vvh(ix ,jy ,indz  ,indexh)*fbot &
+                + vvh(ix ,jy ,indz+1,indexh)*fup
+          w(1,m)=wwh(ix ,jy ,indz  ,indexh_diab)*fbot &
+                + wwh(ix ,jy ,indz+1,indexh_diab)*fup
+          u(2,m)=uuh(ix+1,jy ,indz  ,indexh)*fbot &
+                + uuh(ix+1,jy ,indz+1,indexh)*fup
+          v(2,m)=vvh(ix+1,jy ,indz  ,indexh)*fbot &
+                + vvh(ix+1,jy ,indz+1,indexh)*fup
+          w(2,m)=wwh(ix+1,jy ,indz  ,indexh_diab)*fbot&
+                + wwh(ix+1,jy ,indz+1,indexh_diab)*fup
+          u(3,m)=uuh(ix ,jy+1,indz  ,indexh)*fbot &
+                + uuh(ix ,jy+1,indz+1,indexh)*fup
+          v(3,m)=vvh(ix ,jy+1,indz  ,indexh)*fbot &
+                + vvh(ix ,jy+1,indz+1,indexh)*fup
+          w(3,m)=wwh(ix ,jy+1,indz  ,indexh_diab)*fbot &
+                + wwh(ix ,jy+1,indz+1,indexh_diab)*fup
+          u(4,m)=uuh(ix+1,jy+1,indz  ,indexh)*fbot &
+                + uuh(ix+1,jy+1,indz+1,indexh)*fup
+          v(4,m)=vvh(ix+1,jy+1,indz  ,indexh)*fbot &
+                + vvh(ix+1,jy+1,indz+1,indexh)*fup
+          w(4,m)=wwh(ix+1,jy+1,indz  ,indexh_diab)*fbot &
+                + wwh(ix+1,jy+1,indz+1,indexh_diab)*fup
 
           u1(m)=p1*u(1,m)+p2*u(2,m)+p3*u(3,m)+p4*u(4,m)
           v1(m)=p1*v(1,m)+p2*v(2,m)+p3*v(3,m)+p4*v(4,m)
@@ -1556,12 +1583,12 @@ subroutine interpol_wind_jra55 &
           indexh=memind(m)          
           tp(1,m)=tth(ix ,jy ,indz  ,indexh)*fbot  &
                 + tth(ix ,jy ,indz+1,indexh)*fup
-          tp(2,m)=tth(ixp,jy ,indz  ,indexh)*fbot &
-                + tth(ixp,jy ,indz+1,indexh)*fup
-          tp(3,m)=tth(ix ,jyp,indz  ,indexh)*fbot  &
-                + tth(ix ,jyp,indz+1,indexh)*fup
-          tp(4,m)=tth(ixp,jyp,indz  ,indexh)*fbot  &
-                + tth(ixp,jyp,indz+1,indexh)*fup
+          tp(2,m)=tth(ix+1,jy ,indz  ,indexh)*fbot &
+                + tth(ix+1,jy ,indz+1,indexh)*fup
+          tp(3,m)=tth(ix ,jy+1,indz  ,indexh)*fbot  &
+                + tth(ix ,jy+1,indz+1,indexh)*fup
+          tp(4,m)=tth(ix+1,jy+1,indz  ,indexh)*fbot  &
+                + tth(ix+1,jy+1,indz+1,indexh)*fup
           tp1(m)=p1*tp(1,m)+p2*tp(2,m)+p3*tp(3,m)+p4*tp(4,m)
           
       enddo
@@ -1572,14 +1599,13 @@ subroutine interpol_wind_jra55 &
 
       dxdt=u1(1)*dt2+u1(2)*dt1
       dydt=v1(1)*dt2+v1(2)*dt1
-      if (z_motion)    dzdt=w1(1)*dt2+w1(2)*dt1
-      if (jra55_diab)  dzdt=w1(1)*dt2_diab+w1(2)*dt1_diab
+      dzdt=w1(1)*dt2_w+w1(2)*dt1_w
       tint=tp1(1)*dt2+tp1(2)*dt1
       
       !if (tint <=0. ) then
       !   print *,'tint <=0', tint
       !   print *,tp1
-      !   print *,ixp,jyp,indz
+      !   print *,ix+1,jy+1,indz
       !endif
 
 
