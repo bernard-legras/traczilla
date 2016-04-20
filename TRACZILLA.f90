@@ -165,8 +165,7 @@
 ! Allocate the 3D fields
 !***********************
       call alloc_3D      
-      
-
+     
 ! Fix the release times and release positions of all particles
 !*************************************************************
 ! delayed_initialization is required for fields which need 
@@ -188,9 +187,12 @@
       else
         itime0=0
         select case (release_plan)
-        case('CO2','TTL','AGE')
+        case('TTL')
+           print *,'TTL start'
+           print *,'traczilla delayed initialization'
+        case('CO2','AGE')
            if(delayed_initialization) then
-             print *,'flexpart> delayed initialization'
+             print *,'traczilla delayed initialization'
            else
              call fixlayerpart(error)
            endif
@@ -251,6 +253,12 @@
            else
               call fixparticlesClaus(error)
            endif
+        case('StratoClim')
+           if(delayed_initialization) then
+              print *,'flexpart> delayed initialization'
+           else   
+              call fixparticlesTBStratoClim(error)
+           endif   
         end select
       endif
       if (error) goto 999
@@ -293,15 +301,16 @@
         call alloc_jra55
       else
          print *,'alloc_3D uuh vvh tth uupol vvpol ps tt2 u10 v10'
-         allocate (uupol(0:nx-1,0:ny-1,nuvz,2),vvpol(0:nx-1,0:ny-1,nuvz,2))
-         allocate (uuh(0:nx-1,0:ny-1,nuvz,2),vvh(0:nx-1,0:ny-1,nuvz,2))
-         allocate (tth(0:nx-1,0:ny-1,nuvz,2))
+         allocate (uupol(0:nx-1,0:ny-1,nuvz_b:nuvz,2),vvpol(0:nx-1,0:ny-1,nuvz_b:nuvz,2))
+         allocate (uuh(0:nx-1,0:ny-1,nuvz_b:nuvz,2),vvh(0:nx-1,0:ny-1,nuvz_b:nuvz,2))
+         allocate (tth(0:nx-1,0:ny-1,nuvz_b:nuvz,2))
          allocate (ps(0:nx-1,0:ny-1,1,2),tt2(0:nx-1,0:ny-1,1,2))
          allocate (u10(0:nx-1,0:ny-1,1,2),v10(0:nx-1,0:ny-1,1,2))
          ! if needed according to the release plan
+         ! be careful: will not work for nuvz_b>1 until diab code is adapted
          if(TTLactiv .or. CLAUSactiv) then
             print *,'alloc_3D qvh'
-            allocate (qvh(0:nx-1,0:ny-1,nuvz,2))
+            allocate (qvh(0:nx-1,0:ny-1,nuvz_b:nuvz,2))
          endif
          if(diabatic_w .or. isentropic_motion) then
             call alloc_isentrop_perm
@@ -311,7 +320,7 @@
                call alloc_ecmwf_inct
          elseif (z_motion) then
             print *,'alloc_3D wwh'
-            allocate (wwh(0:nx-1,0:ny-1,nwz,2))
+            allocate (wwh(0:nx-1,0:ny-1,nwz_b:nwz,2))
          elseif (mass_diabat) then
             call alloc_iso
          endif
