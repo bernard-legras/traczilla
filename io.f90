@@ -537,6 +537,7 @@ contains
           ibdate_arch = ddin(1); ibtime_arch = ddin(2)
           read(unitpartin) ddin(1)
           itime0=ddin(1)
+          print *,numpart,nbuf,itime0
         case default
           print *,'unknown format ',outfmt
           error=.true.
@@ -555,6 +556,7 @@ contains
         allocate (xyz(3,nbuf),itra(nbuf))
         jseg=numpart/nbuf
         i1=1 ; i2=nbuf ; if=nbuf
+        if(jseg>0) then
         do j=1, jseg
           read(unitpartin)  (xyz(1:3,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
@@ -563,6 +565,7 @@ contains
           itra1(i1:i2)=itra(  1:if)
           i1=i1+if ; i2=i2+if
         enddo
+        endif
         if(if*jseg<numpart) then
           i2=numpart ; if=i2-i1+1
           read(unitpartin) (xyz(1:3,i),itra(i),i=1,if)
@@ -571,11 +574,14 @@ contains
           ztra1(i1:i2)= xyz(3,1:if)
           itra1(i1:i2)=itra(  1:if)
         endif
+        deallocate (xyz,itra)
       case (103)
         allocate (xyz(5,nbuf),itra(nbuf))
-        allocate (qtra1(maxpart))
+        if(.not.allocated(qtra1)) allocate (qtra1(maxpart))
         jseg=numpart/nbuf
         i1=1 ; i2=nbuf ; if=nbuf
+        print *,numpart,nbuf,jseg 
+        if(jseg>0) then
         do j=1, jseg
           read(unitpartin)  (xyz(1:5,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
@@ -585,18 +591,20 @@ contains
           itra1(i1:i2)=itra(  1:if)
           i1=i1+if ; i2=i2+if
         enddo
+        endif
         if(if*jseg<numpart) then
           i2=numpart ; if=i2-i1+1
           read(unitpartin) (xyz(1:5,i),itra(i),i=1,if)
           xtra1(i1:i2)=(xyz(1,1:if)-xlon0)/dx
           ytra1(i1:i2)=(xyz(2,1:if)-ylat0)/dy
           ztra1(i1:i2)= xyz(3,1:if)
-          qtra1(i1:i2)  = xyz(5,1:if)
+          qtra1(i1:i2)= xyz(5,1:if)
           itra1(i1:i2)=itra(  1:if)
         endif
+        deallocate (xyz,itra)
       case (105)
-        allocate(itra0(maxpart))
-!       read initial positions
+        if(.not.allocated(itra0)) allocate(itra0(numpart))
+!       read initial positions for all parcels
         open(unitpartout4,file=trim(path(2))//'sav_init', &
              form='unformatted',status='old')
         read(unitpartout4)xtra1(1:numpart)
@@ -609,6 +617,10 @@ contains
         endif
         itra1(1:numpart)=itra0(1:numpart)
         close(unitpartout4)
+!       read now positions of active parcels over the initial positions
+!       parcels already deactivated are left with their initial position
+!       and not their final position as they were at the end of the previous
+!       run but this is without consequence since they are no longer accessed  
         allocate (xyz(4,nbuf),itra(nbuf),idx(nbuf))
         read(unitpartin) (xyz(1:4,i),idx(i),itra(i),i=1,nbuf)
         do i=1,nbuf
@@ -616,17 +628,17 @@ contains
           xtra1(j)=(xyz(1,i)-xlon0)/dx
           ytra1(j)=(xyz(2,i)-ylat0)/dy
           ztra1(j)=xyz(3,i)
-          itra1(j)=itime0
+          itra1(j)=itra(i) ! itra(i:nbuf) should be equal to itime0
         enddo
         if (ttra1_activ) then
           do i=1,nbuf
             ttra1(idx(i))=xyz(4,i)
           enddo
         endif
+        deallocate (xyz,itra,idx) 
       end select
       print *,'restart > completed'
       close(unitpartin)
-      deallocate(xyz,itra,idx)
       return
       end subroutine restartpart
 
