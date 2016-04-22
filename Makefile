@@ -4,7 +4,7 @@
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
-TARGET=X64-par-ng
+TARGET=X64-ng
 #TARGET=win
 HOME=/home/legras
 
@@ -48,7 +48,7 @@ ifeq ($(TARGET),X64-par-ng)
   CC = pgcc
   CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Msmartalloc
   # include needed for netcdf.mod
-  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -fastsse -Minfo -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -fastsse -Minfo -Mcache_align -Msmartalloc
   #FFLAGS = -I$(HOME)/local-ng/include -Mbounds -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
   #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
   LDFLAGS1 = -rpath $(HOME)/local-ng/lib -L$(HOME)/local-ng/lib -lgribex -lgrib_api -lgrib_api_f90 -lcom -lnetcdf -lnetcdff
@@ -58,7 +58,7 @@ ifeq ($(TARGET),X64-ng)
   CC = pgcc
   CFLAGS = -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
   FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
-  #FFLAGS = -I$(HOME)/local/include -g -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
+  #FFLAGS = -I$(HOME)/local/include -g -Ktrap=inv,divz,ovf -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo
   LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
 endif
 ifeq ($(TARGET),win)
@@ -80,7 +80,7 @@ endif
 
 #
 OBJECTS0 = commons.mod date.mod coord.mod thermo.mod io.mod interpol.mod lyapunov.mod\
-isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterp.mod\
+isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterpN.mod\
 sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod jra55.mod combin.mod \
 demar.mod advect.mod 
 
@@ -95,7 +95,7 @@ $(OBJECTS1): $(OBJECTS0)
 .PHONY : clean
 clean:
 	\rm *.o *.mod  
-	ln -s ~/local/grib_api/include/grib_api.mod
+	ln -s ~/local/include/grib_api.mod
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
 #$Log: 
