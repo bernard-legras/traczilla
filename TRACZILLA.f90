@@ -1,6 +1,7 @@
 
 !**********************************************************************
-! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013           *
+! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013, 2015,     * 
+! 2016                                                                *
 ! Andreas Stohl, Bernard Legras                                       *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
@@ -177,13 +178,8 @@
 ! call to restart routine, the branching between a restart from a part file 
 ! or from a full save is done within restartpart
         call restartpart(error)
+! Make sure the restart file is not overwritten at the start of the run
         loffset=itime0+loutstep
-!      Depreciated as no old initialization still in use
-!      else if (releases_old) then
-!        itime0=0
-!        call coordtrafo(error) ! conversion of starting coordinates
-!        if (error) goto 999
-!        call fixparticlesB(error)
       else
         itime0=0
         select case (release_plan)
