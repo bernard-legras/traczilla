@@ -81,6 +81,7 @@ contains
  use mass_iso
  use merra
  use jra55
+ use readinterpN, only : ecmwf_data 
  
  character(len=72):: line
  logical error
@@ -120,7 +121,8 @@ contains
    restart,hrstart,     & ! restart run, hour labeling the restart file
    correct_vertwind,    & ! correcting vertical wind
    delay_switch_diff_off,& ! diffusion is switched off after this delay (in s)
-   data_source,         & ! source of the data (EI, MERRA, JRA-55)
+   data_source,         & ! data source (for compatibility version, set after reading)
+   ecmwf_data ,         & ! use ECMWF data
    diabatic_w,          & ! diabatic velocities are used
    ecmwf_diabatic_w,    & ! diabatic velocities from ecmwf archive
    clear_sky,           & ! clear sky version of diabatic velocities
@@ -141,8 +143,9 @@ contains
    merra_data,          & ! merra winds
    merra_diab,          & ! merra heating rates
    jra55_data,          & ! jra55 winds
-   jra55_diab             ! jra55 heating rates  
+   jra55_diab             ! jra55 heating rates
    
+  
 !Open the command file and read user options
 !-------------------------------------------
 
@@ -188,7 +191,7 @@ contains
  lconvection = 0
  diftype = 1
  diffus = 0.
- verdiff=.true.
+ verdiff=.false.
  hordiff=.false.
  release_plan='o3sonde'
  vert_interpol='log'
@@ -216,6 +219,9 @@ contains
  mean_diab_output=.false.
  merra_data=.false.
  merra_diab=.false.
+ jra55_data=.false.
+ jra55_diab=.false.
+ ecmwf_data=.true.
  data_source='EI'
  
  read(unitcommand,NML=COMMAND)
@@ -232,6 +238,16 @@ contains
  endif
  fine=1./float(ifine)
  ctl=1./ctl
+ 
+! Fix data source
+!---------------- 
+ if(ecmwf_data) then
+   data_source='EI'
+ else if (jra55_data) then
+   data_source='JRA55'
+ else if (merra_data) then
+   data_source='MERRA'
+ endif     
 
 ! Check input dates
 !------------------
@@ -298,9 +314,9 @@ contains
  print *,'readcommand > z_motion ',z_motion
  print *,'readcommand > isentropic_motion ',isentropic_motion
  print *,'readcommand > diabatic_w ',diabatic_w
- print *,'readcommand > ecmwf_diabatic_w ',ecmwf_diabatic_w
  print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
  print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
+ print *,'readcommand > ecmwf_data _diabatic_w ',ecmwf_data,ecmwf_diabatic_w 
  print *,'readcommand > clear_sky ',clear_sky
  print *,'readcommand > cloud_sky ',cloud_sky
  print *,'readcommand > ecmwf_inct_w ',ecmwf_inct_w
@@ -511,6 +527,7 @@ contains
     curtain_type,      &  
     make_uni3D,        &
     uniform_mesh
+    
  namelist /O3SONDE/    &
     name_station,      & ! name of launching station
     long_station,      & ! longitude of launching station (deg)
@@ -530,7 +547,9 @@ contains
     launch_date,        & ! launch date (yyyymmdd)
     launch_time,        & ! launch time (hhmmss)
     n_sample,           & ! sample size per point
+    tropodir,           & ! directory where to find the surf380K file
     TTLactiv              ! activation of humidity saturation calculations
+    
  namelist /AGEF/        &
     long_min,           & ! minimum longitude
     long_max,           & ! maximum longitude
@@ -545,7 +564,8 @@ contains
     launch_date_end,    & ! end launch date (yyyymmdd)
     launch_time_end,    & ! end launch time (hhmmss)
     launch_int,         & ! launch interval (s)
-    pcut,               & ! pressure threshold to stop trajectories (Pa)
+    pcut,               & ! max pressure threshold to stop trajectories (Pa)
+    plowcut,            & ! min pressure threshold to stop trajectories (Pa)
     thetacut,           & ! theta top boundary to stop trajs (K)   
     TTLFILLactiv,       & ! activate low theta cut and deactivate pcut
     thetalowcut,        & ! low theta cut
@@ -604,6 +624,7 @@ contains
     instant_release,    & ! if .true., release at observed time with partial step
     interp_release,     & ! if .true., interpolated release
     n_loc                 ! number of points (if interp_release=.true.)
+    
  namelist /ER2/         &
     ER2_dir,            & ! ER2 directory
     ER2_day,            & ! flight day	
@@ -614,14 +635,30 @@ contains
     interp_release,     & ! if .true., interpolated release
     n_loc,              & ! number of points (if interp_release=.true.)
     campaign              ! name of the campaign
+    
  namelist /CLAUS/       &
     Claus_dir,          & ! CLAUS directory
     iedate_Claus, ietime_Claus, & ! ending date and time (YYYYMMDD, HHMISS) for the released parcels
-    diabatic_Claus,     & ! if .true., pressure levels; if .false. z levels
+    diabatic_Claus,     & ! if .true., theta levels; if .false. z levels
     TB_max,             & ! maximum brightness temperature (Kelvin) of the released parcel (top cloud)
     latmin_Claus,       & ! minimum latitude where it can exist a released parcel at the initial time
     latmax_Claus,       & ! maximum latitude where it can exist a released parcel at the initial time
     thetacut              ! potential temperature killing boundary
+    
+ namelist /StratoClim/  &
+    TBStratoClim_dir,   & ! StratoClim directory
+    diabatic_Stratoclim,& ! if .true., pressure levels; if .false. z levels
+    TB_max,             & ! maximum brightness temperature (Kelvin) of the released parcels
+    thetacut              ! potential temperature killing boundary    
+    
+ namelist /StratoClim/  &
+    TBStratoClim_dir,   & ! StratoClim directory
+    diabatic_Stratoclim,& ! if .true., theta levels; if .false. z levels
+    TB_max,             & ! maximum brightness temperature (Kelvin) of the released parcels
+    pcut,               & ! max pressure threshold to stop trajectories (Pa)
+    plowcut,            & ! min pressure threshold to stop trajectories (Pa)
+    thetacut,           & ! potential temperature killing boundary
+    fulldate_cloudtop     ! date of the first launch (integer yyyymmddhh format)   
 
 ! Initialize logical variables
 !-----------------------------
@@ -632,6 +669,7 @@ contains
  shuffling=.false.
  external_pos0=.false.
  CLAUSactiv=.false.
+ StratoClimactiv =.false.
  track_kill=.false.
  track_cross=.false.
    
@@ -705,7 +743,9 @@ contains
     numpoint=1
     theta_l=0.
     pcut=25000._dp
+    plowcut=0._dp
     thetacut=1800._dp
+    thetalowcut=100._dp
     make_uni3D=.false.
     uniform_spread=.false.
     uniform_mesh=.false.
@@ -812,8 +852,8 @@ contains
 
  ! Releases particles in the TTL
  ! Type a: particles are released within a lat-long box
- ! at a fixed pressure level
-   case('TTL')
+ ! at a fixed pressure or theta level 
+    case('TTL')
     print *,'readreleases> TTL'
     numpoint=1
     n_sample=1
@@ -832,19 +872,20 @@ contains
     xpoint2(1)=long_max
     ypoint1(1)=lat_min;  
     ypoint2(1)=lat_max
-    if(press_l > 0.) then
+    delayed_initialization=.true.
+    press2theta=.false.
+    theta2press=.false.
+    if(press_l > 0.) then      
       if(diabatic_w .or. isentropic_motion) then
-        delayed_initialization=.true.
         press2theta=.true.
       endif
       zpoint1(1)=-log(press_l/p0)
     else if (theta_l > 0.) then
       if(z_motion) then
-        delayed_initialization=.true.
         theta2press=.true.
       endif
       zpoint1(1)=theta_l
-    else
+    else  
       go to 998
     endif
     nsample(1)=n_sample
@@ -889,8 +930,8 @@ contains
       endif
       zpoint1(1)=-log(press_l/p0)
     else if (theta_l > 0.) then
-      if(z_motion) then
-        delayed_initialization=.true.
+      delayed_initialization=.true.
+      if(z_motion) then   
         theta2press=.true.
       endif
       zpoint1(1)=theta_l
@@ -1044,7 +1085,32 @@ contains
     print *,'readreleases> latmin_Claus ',latmin_Claus
     print *,'readreleases> latmax_Claus ',latmax_Claus
     print *,'readreleases> thetacut ',thetacut
+ 
+ ! Releases parcels at the top of clouds from meteosat/himawari
+ case('StratoClim')
+    TBStratoClim_dir = "/data/atissier/flexpart_in/StratoClim+1km/"
+    diabatic_StratoClim = .false.
+    TB_max = 230
+    fulldate_cloudtop=2016032900
+    thetacut = 380._dp
+    pcut=25000._dp
+    plowcut=0._dp
+    !debug_out=.true.
     
+    delayed_initialization = .true.
+    AccurateTemp = .true.
+    correct_vertwind=.false.
+
+    read(unitreleases, StratoClim)
+    StratoClimactiv = .true.
+    write(6,StratoClim)
+    print *,'readreleases> StratoClim'
+    print *,'readreleases>', TBStratoClim_dir
+    print *,'readreleases> diabatic_StratoClim', diabatic_StratoClim
+    print *,'readreleases> TB_max ',TB_max
+    print *,'readreleases> thetacut ',thetacut
+    print *,'readreleases> pcut plowcut ',pcut,plowcut
+      
  case default
    error=.true.
    write(*,*)  
@@ -1222,6 +1288,384 @@ end subroutine readreleasesB2
       return
 
       end subroutine fixparticlesB
+      
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FIX_SIMPLE_LAYER @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+	
+      subroutine fix_simple_layer(error)
+      
+!*******************************************************************************
+!                                                                              *
+!     This routine fixes the release times and release locations of all        *
+!     particles within several pressure or potential temperature layers.
+!     A simple code extracted from fixlayerpart without the complicated
+!     and confusing options of that code 
+!                                                                              *
+!     Author: B. Legras      
+!                                                                              *
+!     07/07/2015               
+!*******************************************************************************
+!                                                                              *
+! Variables:                                                                   *
+!                                                                              *
+!*******************************************************************************
+
+      real xc,yc, zc, epsil, epsil2, ylat, pint, lev 
+      real corrected_mesh_size
+      integer idummy,i,j,it,numparti,count_lon,jl,jy,indz,ix,jyps
+      integer nb_points_latcircle
+      real ddx, ddy, rddx, rddy, p1, p2, p3, p4, psurf
+      logical error
+      data idummy/-7/
+
+      error = .false.
+      epsil =  1.e-4 ; epsil2=1.e-7
+      
+      numpart=0 
+      print *,'numpoint ',numpoint
+      open(unitpartout,file=trim(path(2))//'release_table')
+      print *,'path',path(2)
+      layerloop: do i=1,numpoint
+        n_loc = 0
+        numparti=numpart+1
+        xpoint1(i) = (xpoint1(i)-xlon0)/dx
+        xpoint2(i) = (xpoint2(i)-xlon0)/dx
+        ypoint1(i) = (ypoint1(i)-ylat0)/dy
+        ypoint2(i) = (ypoint2(i)-ylat0)/dy
+        mesh_size_lat  = mesh_size_lat/dy
+        mesh_size_long = mesh_size_long/dx
+        print *,'fix_simple_layer > sizes  ',mesh_size_long,mesh_size_lat
+        it = ireleasestart(i) - mod(ireleasestart(i),abs(lsynctime)) 
+        print *,'fix_simple_layer > xpoint ',xpoint1(i),xpoint2(i)
+        print *,'fix_simple_layer > ypoint ',ypoint1(i),ypoint2(i)
+        print *,'fix_simple_layer > dx, dy  ',dx,dy
+        if ((xpoint1(i) < 0.).or.(xpoint1(i) > nx+epsil2)) go to 999
+        if ((xpoint2(i) < 0.).or.(xpoint2(i) > nx+epsil2)) go to 999
+        if ((ypoint1(i) < 0.).or.(ypoint1(i) > ny+epsil2)) go to 999
+        if ((ypoint2(i) < 0.).or.(ypoint2(i) > ny+epsil2)) go to 999  
+
+! set horizontal locations
+! if horizontal spread, number of points along a contour depends on cos of lat
+! otherwise it is constant over each latitude circle and latitude is the fast
+! variable in the array (unlike usual conventions)
+        if (uniform_spread) then     
+            yc = ypoint1(i)
+            do while (yc <= ypoint2(i)+epsil)
+               ylat = (ylat0 + yc*dy)*pi/180.
+               xc = xpoint1(i)
+               count_lon=0
+               if (uniform_mesh) then
+                 nb_points_latcircle = int(nx*abs(cos(ylat))/mesh_size_long)
+                 if(nb_points_latcircle>0) then
+                   corrected_mesh_size = float(nx)/nb_points_latcircle
+                 else
+!                  set a large value to get only 1 pt on circle               
+                   corrected_mesh_size = 2*float(nx) 
+                 endif
+               else
+                 corrected_mesh_size = mesh_size_long/(abs(cos(ylat))+epsil2)
+               endif
+               do while (xc <= xpoint2(i)+epsil)
+                 n_loc=n_loc+1
+                 count_lon=count_lon+1  
+                 do j=1,nsample(i)
+                   numpart = numpart+1 
+                   if(numpart > maxpart) go to 996
+                   xtra1(numpart) = xc
+                   ytra1(numpart) = yc
+                   ztra1(numpart) = zpoint1(i)
+                 enddo
+                 xc = xc + corrected_mesh_size
+               enddo
+               write(unitpartout,'(4G15.6)') ylat0+yc*dx,xlon0, &
+                  corrected_mesh_size*dx,count_lon
+               yc = yc+mesh_size_lat
+            enddo
+            print *,'fix_simple_layer > numpart after uniform spread ',numpart
+        else  
+          xc = xpoint1(i)
+          do while (xc <= xpoint2(i)+epsil)
+             yc = ypoint1(i)
+             do while (yc <= ypoint2(i)+epsil)
+                n_loc = n_loc+1
+                do j=1,nsample(i)
+                   numpart = numpart+1 
+                   if(numpart > maxpart) go to 996
+                   xtra1(numpart) = xc
+                   ytra1(numpart) = yc
+                   ztra1(numpart) = zpoint1(i)
+                enddo
+                yc = yc+mesh_size_lat
+             enddo
+             xc = xc+mesh_size_long
+             !----------- temporary test
+             !if((xc.lt.0).or.(xc.gt.nx-1)) then
+             !   print *,'fixlayerpart > ALARM!!: xc ',xc
+             !endif
+             !-----------        
+          enddo
+          print *,'fix_simple_layer > numpart for reg grid ',numpart
+        endif
+! set vertical positions and initialise time
+        do j=numparti,numpart          
+          itra1(j) = it
+          itramem(j) = it
+        enddo
+      enddo layerloop
+      close(unitpartout)
+      print *,'fix_simple_layer > completed, numpart ',numpart
+      return
+
+996   error=.true.
+      write(*,*) '#####################################################'
+      write(*,*) '#### TRACZILLA MODEL SUBROUTINE FIXPARTICLES:    ####'
+      write(*,*) '####                                             ####'
+      write(*,*) '#### ERROR - TOTAL NUMBER OF PARTICLES SPECIFIED ####'
+      write(*,*) '#### IN FILE "RELEASES" OR CARRIED FORWARD FROM  ####'
+      write(*,*) '#### PREVIOUS RUN EXCEEDS THE MAXIMUM ALLOWED    ####'
+      write(*,*) '#### NUMBER. REDUCE EITHER NUMBER OF PARTICLES   ####'
+      write(*,*) '#### PER RELEASE POINT OR REDUCE NUMBE OF        ####'
+      write(*,*) '#### RELEASE POINTS.                             ####'
+      write(*,*) '#####################################################'
+      return
+      
+     
+999   error=.true.
+      write(*,*) '#####################################################'
+      write(*,*) '###  ERROR IN THE XPOINT YPOINT INITIALIZATION    ###'
+      write(*,*) '#####################################################'
+      return            
+  
+      end subroutine fix_simple_layer
+    
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SET_TEMP_FOR_THETA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+
+subroutine set_temp_for_theta(error)
+!*******************************************************************************
+!
+!    This routine defines the temperature after fix_simple_layer and can be used to
+!    define the pressure in a z_motion run when the initialization is required
+!    in theta.  
+!    Should be used in delayed initialization mode when the temperature of the 
+!    first field has been read.
+!    An extension to be made can apply this code in AGEF runs when the temperature
+!    needs to be initialized.  
+!
+!    Author: B. Legras
+!    
+!    07/07/2015
+!
+!*******************************************************************************
+!
+!    Variables:
+!
+!*******************************************************************************   
+  
+  use isentrop_h
+  use readinterpN, only : ecmwf_data
+  use jra55, only : jra55_data
+  use merra, only : merra_data,merra_diab 
+  
+  logical, intent(out):: error
+  real(dp), allocatable :: logzp(:),logpzp(:),mtab(:)
+  real(dp), allocatable :: log_press_prof(:), log_theta_prof(:), temp_prof(:)
+  real(dp):: psaver 
+  integer :: errm
+  integer :: i,ix,jy,nbtheta
+  real(dp) :: p1,p2,p3,p4,ddx,ddy,rddx,rddy
+  
+  call alloc_isentrop_perm
+  allocate (log_theta_prof(lower_theta_level:upper_theta_level))
+  allocate (log_press_prof(lower_theta_level:upper_theta_level))
+  allocate (temp_prof(lower_theta_level:upper_theta_level))
+  allocate (mtab(lower_theta_level:upper_theta_level))
+  nbtheta=upper_theta_level-lower_theta_level+1
+  allocate (logzp(1),logpzp(1))
+  error=.false.
+  
+  if (.not.allocated(ttra1)) then
+     allocate(ttra1(maxpart))
+     print *,'allocated ttra1 in set_temp_for_theta '
+  endif  
+  
+! Loop on the particles
+! This can be made more selective for enlarged applications (e.g. AGEB)
+! where this routine is called several times on a selected range of parcels
+! This code can be slow as the procedure is repeated for each parcel
+! one per one without taking vertical distribution into account when
+! there is more than one layer 
+  dopart: do i=1,numpart
+     if(xglobal) ix=modulo(floor(xtra1(i)),nx-1)       
+      jy=max(min(floor(ytra1(i)),ny-1),-1)
+      ddx=modulo(xtra1(i)-float(ix),1.)
+      ! accounts for the two polar regions in JRA55
+      ! the case should not occur for EI since 0 <= yt <= ny-1
+      ! check change for MERRA
+      if (ytra1(i)<0) then
+         ddy=ytra1(i)/(90._dp/dy-ny/2)+1._dp
+      else if (ytra1(i)>ny-1) then
+         ddy=(ytra1(i)+1._dp-ny)/(90._dp/dy-ny/2)
+      else
+         ddy=ytra1(i)-float(jy)
+      endif
+      rddx=1.-ddx      ;  rddy=1.-ddy
+      p1=rddx*rddy     ;  p2=ddx*rddy
+      p3=rddx*ddy      ;  p4=ddx*ddy
+      ! Calculate theta column on adjacent points
+      ! Works for both JRA55 and ERA-Int
+      ! For MERRA, replace by calc_col_theta_merra (CHECK)
+      if (jra55_data.or.ecmwf_data) then      
+         call calc_col_theta(ix,jy,1)
+         call calc_col_theta(ix+1,jy,1)
+         call calc_col_theta(ix,jy+1,1)
+         call calc_col_theta(ix+1,jy+1,1)
+      else if (merra_diab) then
+         print *,'ERROR set_temp_for_theta'
+         error=.true.
+         return  
+      endif   
+      ! Calculate pressure column 
+      ! Works for both JRA55 and ERA-Int
+      ! For MERRA, just use the fixed pressure levels
+      ! psaver in Pascal
+      psaver=ps(ix,jy,1,1)*(1-ddx)*(1-ddy) + ps(ix+1,jy,1,1)*(1-ddx)*ddy &
+            +ps(ix,jy+1,1,1)*ddx*(1-ddy) + ps(ix+1,jy+1,1,1)*ddx*ddy
+      log_theta_prof=log(theta_g(:,ix,jy,1)*(1-ddx)*(1-ddy) &
+                        +theta_g(:,ix+1,jy,1)*(1-ddx)*ddy &
+                        +theta_g(:,ix,jy+1,1)*ddx*(1-ddy) &
+                        +theta_g(:,ix+1,jy+1,1)*ddx*ddy)
+      log_press_prof=log(akz(lower_theta_level:upper_theta_level) &
+                        +bkz(lower_theta_level:upper_theta_level)*psaver)
+      ! Calculate temperature column
+      temp_prof=tth(ix,jy,lower_theta_level:upper_theta_level,1)*(1-ddx)*(1-ddy) &
+               +tth(ix+1,jy,lower_theta_level:upper_theta_level,1)*ddx*(1-ddy)   &
+               +tth(ix,jy+1,lower_theta_level:upper_theta_level,1)*(1-ddx)*ddy   &
+               +tth(ix+1,jy+1,lower_theta_level:upper_theta_level,1)*ddx*ddy
+      ! Perform the interpolation
+      ! Calculate slopes
+      call slopes(log_theta_prof,log_press_prof,mtab,nbtheta)
+      logzp(1)=log(ztra1(i))
+      ! Find pressure for the required theta level
+      call meval_spe(logzp(1:1),logpzp(1:1),& 
+        log_theta_prof,log_press_prof,mtab,nbtheta,1,0.,errm)
+      if (errm>0) then
+         print *,'error in getting pressure from theta ',errm
+         error=.true.
+         return
+      endif
+      ! Interpolate temperature to the pressure level 
+      ! (inverting pressure to get increasing values)      
+      call uvip3p(3,nbtheta,-log_press_prof,temp_prof,1,-logpzp(1:1),ttra1(i:i))
+      ! Set the z coordinate if pressure levels are used
+      if (z_motion.and.theta2press) then
+         ztra1(i)= log(p0)-logpzp(1)
+      endif              
+  enddo dopart
+
+end subroutine set_temp_for_theta      
+
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ SET_TEMP_FOR_THETA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
+
+subroutine set_temp_for_press(error)
+!*******************************************************************************
+!
+!    This routine defines the temperature and can be used to
+!    define the pressure in a z_motion run when the initialization is required
+!    in theta.  
+!    Should be used in delayed initialization mode when the temperature of the 
+!    first field has been read.
+!    An extension to be made can apply this code in AGEF runs when the temperature
+!    needs to be initialized.  
+!
+!    Author: B. Legras
+!    
+!    07/07/2015
+!
+!*******************************************************************************
+!
+!    Variables:
+!
+!*******************************************************************************   
+  
+  use isentrop_h
+  use readinterpN, only : ecmwf_data
+  use jra55, only : jra55_data
+  use merra, only : merra_data 
+  
+  logical, intent(out) :: error
+  real(dp), allocatable :: logzp(:)
+  real(dp), allocatable :: log_z_prof(:), temp_prof(:)
+  real(dp):: psaver, errm
+  integer :: i,ix,jy,nblevel
+  real(dp) :: p1,p2,p3,p4,ddx,ddy,rddx,rddy
+    
+  allocate (log_z_prof(lower_theta_level:upper_theta_level))
+  ! notice the non-orthodox usage of lower_theta_level and upper_theta_level
+  ! used as generic lower_level and upper_level
+  nblevel=upper_theta_level-lower_theta_level+1
+  allocate (logzp(1))
+  error=.false.
+  
+  if (.not.allocated(ttra1)) then
+     allocate(ttra1(maxpart))
+     print *,'allocated ttra1 in set_temp_for_press'
+  endif
+  
+! Loop on the particles
+! This can be made more selective for enlarged applications (e.g. AGEB)
+! where this routine is called several times on a selected range of parcels
+! This code can be slow as the procedure is repeated for each parcel
+! one per one without taking vertical distribution into account when
+! there is more than one layer 
+  dopart: do i=1,numpart
+     if(xglobal) ix=modulo(floor(xtra1(i)),nx-1)       
+      jy=max(min(floor(ytra1(i)),ny-1),-1)
+      ddx=modulo(xtra1(i)-float(ix),1.)
+      ! accounts for the two polar regions in JRA55
+      ! the case should not occur for EI since 0 <= yt <= ny-1
+      ! check change for MERRA
+      if (ytra1(i)<0) then
+         ddy=ytra1(i)/(90._dp/dy-ny/2)+1._dp
+      else if (ytra1(i)>ny-1) then
+         ddy=(ytra1(i)+1._dp-ny)/(90._dp/dy-ny/2)
+      else
+         ddy=ytra1(i)-float(jy)
+      endif
+      rddx=1.-ddx      ;  rddy=1.-ddy
+      p1=rddx*rddy     ;  p2=ddx*rddy
+      p3=rddx*ddy      ;  p4=ddx*ddy
+      
+      ! Calculate pressure column 
+      ! Works for both JRA55 and ERA-Int
+      ! For MERRA, just use the fixed pressure levels
+      ! psaver in Pascal
+      psaver=ps(ix,jy,1,1)*(1-ddx)*(1-ddy) + ps(ix+1,jy,1,1)*(1-ddx)*ddy &
+            +ps(ix,jy+1,1,1)*ddx*(1-ddy) + ps(ix+1,jy+1,1,1)*ddx*ddy
+      log_z_prof=log(p0)-log(akz(lower_theta_level:upper_theta_level) &
+                        +bkz(lower_theta_level:upper_theta_level)*psaver)
+      ! Calculate temperature column
+      temp_prof=tth(ix,jy,lower_theta_level:upper_theta_level,1)*(1-ddx)*(1-ddy) &
+               +tth(ix+1,jy,lower_theta_level:upper_theta_level,1)*ddx*(1-ddy)   &
+               +tth(ix,jy+1,lower_theta_level:upper_theta_level,1)*(1-ddx)*ddy   &
+               +tth(ix+1,jy+1,lower_theta_level:upper_theta_level,1)*ddx*ddy
+      ! Perform the interpolation
+      ! Calculate slopes
+      logzp(1)=ztra1(i)
+      ! Interpolate temperature to the pressure level 
+      ! (inverting pressure to get increasing values)      
+      call uvip3p(3,nblevel,log_z_prof,temp_prof,1,logzp(1:1),ttra1(i:i))
+      ! Set the z coordinate if pressure levels are used
+      if (diabatic_w.and.press2theta) then
+         ztra1(i)= ttra1(i)*exp(kappa*ztra1(i))
+      endif              
+  enddo dopart
+
+end subroutine set_temp_for_press 
 
 !===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FIXLAYERPART @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -1288,7 +1732,10 @@ end subroutine readreleasesB2
 ! otherwise it is constant over each latitude circle and latitude is the fast
 ! variable in the array (unlike usual conventions)
         if (uniform_spread) then
+! The following option works for pressure, not for diabatic runs 
+! TODO: reorganize into a more general 3D setting           
           if(make_uni3D) then
+            if (diabatic_w) go to 997
             yc = ypoint1(i)
             do while (yc <= ypoint2(i)+epsil)
                jy=floor(yc)
@@ -1385,9 +1832,11 @@ end subroutine readreleasesB2
             enddo
             print *,'fixlayerpart > numpart after make_layer ',numpart
           endif
+          
 !         Adding vertical curtains of parcel at selected latitudes 
 !         (only available under uniform spread
 
+! This mode also restrained to initialize pressure values      
           if (make_curtain) then
              do jl=1,size(lat_list)
                ylat = lat_list(jl)*pi/180._dp  
@@ -1469,7 +1918,7 @@ end subroutine readreleasesB2
 
 996   error=.true.
       write(*,*) '#####################################################'
-      write(*,*) '#### FLEXPART MODEL SUBROUTINE FIXPARTICLES:     ####'
+      write(*,*) '#### TRACZILLA MODEL SUBROUTINE FIXPARTICLES:    ####'
       write(*,*) '####                                             ####'
       write(*,*) '#### ERROR - TOTAL NUMBER OF PARTICLES SPECIFIED ####'
       write(*,*) '#### IN FILE "RELEASES" OR CARRIED FORWARD FROM  ####'
@@ -1479,15 +1928,21 @@ end subroutine readreleasesB2
       write(*,*) '#### RELEASE POINTS.                             ####'
       write(*,*) '#####################################################'
       return
+      
+997   error=.true.
+      write(*,*) '### DO NOT USE MAKE_UNI3D IN FIXLAYERPART        ####'
+      write(*,*) '### FOR DIABATIC RUNS                            ####'
+      return      
 
 999   error=.true.
       write(*,*) '#####################################################'
       write(*,*) '###  ERROR IN THE XPOINT YPOINT INITIALIZATION    ###'
       write(*,*) '#####################################################'
       return
-
+         
       end subroutine fixlayerpart
       
+     
 !===============================================================================
 !@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FIXPRESSLAYERPART @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 !=====|==1=========2=========3=========4=========5=========6=========7=========8
@@ -1629,7 +2084,7 @@ end subroutine readreleasesB2
 !       If this is not the case, calculate indz inside the loop on xc, yc
 !       with pint calculated
             pint=p0*exp(-zpoint1(i))
-            indz=locuv(1,nuvz,p0)
+            indz=locuv(nuvz_b,nuvz,p0)
             coef_interp=(pint- akz(indz+1) - bkz(indz+1)*p0) &
                    /(akz(indz)-akz(indz+1)+p0*(bkz(indz)-bkz(indz+1)))
             print *,'fixpresslayerpart > coef_interp, ',coef_interp
@@ -1718,7 +2173,7 @@ end subroutine readreleasesB2
 
         else  
           pint=p0*exp(-zpoint1(i))
-          indz=locuv(1,nuvz,p0)
+          indz=locuv(nuvz_b,nuvz,p0)
           coef_interp=(pint- akz(indz+1) - bkz(indz+1)*p0) &
                    /(akz(indz)-akz(indz+1)+p0*(bkz(indz)-bkz(indz+1)))
           xc = xpoint1(i) 
@@ -1817,10 +2272,11 @@ end subroutine readreleasesB2
 !*******************************************************************************
 !                                                                              *
 !     This routine fixes the release times and release locations of all        *
-!     particles a fixed number of potential temperature layers.                *
+!     particles a fixed number of potential temperature or pressure layers
+!     and over a time interval                                                 *
 !                                                                              *
 !     Author: B. Legras
-!     2012                                                                         *
+!     2012                                                                     *
 !    
 !                                                                              *
 !*******************************************************************************
@@ -1997,11 +2453,14 @@ end subroutine readreleasesB2
 !*******************************************************************************b
 !                                                                              *
 !     This routine fixes the release times and release locations of all        *
-!     particles a fixed number of potential temperature layers.                *
+!     particles a fixed number of potential temperature layers 
+!     and over a interval of time.
+!     In addition this version masks particles located under the tropopause    *
+!     Used in AGEB 
 !                                                                              *
 !     Author: B. Legras
 !     25 October 2014
-!     from the previous version of fixmultilayer                                                                         *
+!     from the previous version of fixmultilayer                               *
 !    
 !                                                                              *
 !*******************************************************************************
@@ -2224,7 +2683,9 @@ end subroutine readreleasesB2
 !                                                                              *
 !     Author: B. Legras
 !     23 March 2015
-!     from the previous version of fixmultilayer_tropomask                                                                       *
+!     from the previous version of fixmultilayer_tropomask
+!     designed for jra-55, cannot be used for other reanalysis 
+!     at the moment                                                                       *
 !    
 !                                                                              *
 !*******************************************************************************
@@ -2352,6 +2813,7 @@ end subroutine readreleasesB2
    enddo
    print *,'tropopause loaded ',yy
    domm: do mm=1,12
+!  Reading section depending on JRA-55
 !    read indexes here
      write(month,'(I2.2)')mm
      call grib_index_read(idxt, &
@@ -2371,7 +2833,7 @@ end subroutine readreleasesB2
 !      loop on the number of layers
        packet_len(tt)=0
        
-!      here read the temperature and ps data from the required time
+!      here read the temperature from the required time
        call grib_index_select(idxt,'mars.date',year//month//day)
        call grib_index_select(idxt,'mars.time','1200')
        call grib_index_select(idxt,'mars.param','11.200')
@@ -2381,13 +2843,15 @@ end subroutine readreleasesB2
          call grib_get_real4_array(igrib,'values',values,iret)      
          val_gauss=reshape(values,(/nx-1,ny/))
 !        Interpolation to regular grid
-!        Non polar latitudes only
+!        Non polar latitudes only in JRA55 (that is 0:ny-1 in lat index)
+!        Polar ring of no usage here
          do lat=1,ny
            tth(0:nx-2,ny-lat,l,1) = w1(lat)*val_gauss(1:nx-1,g1(lat)) &
                                    +w2(lat)*val_gauss(1:nx-1,g2(lat))
          enddo
          if(xglobal) tth(nx-1,0:ny-1,l,1) = tth(0,0:ny-1,l,1)
        enddo
+!      now read surface pressure and interpolate 
        call grib_index_select(idxps,'mars.date',year//month//day)
        call grib_index_select(idxps,'mars.time','1200')
        call grib_new_from_index(idxps,igrib, iret)
@@ -2399,6 +2863,7 @@ end subroutine readreleasesB2
        enddo
        if(xglobal) ps(nx-1,0:ny-1,1,1) = ps(0,0:ny-1,1,1)
 !      Assume that xpoint and ypoint do not depend on the level
+!      End of JRA-55 reading section
  
        if (xglobal) then
          xlm=xpoint2(1)
@@ -2457,12 +2922,14 @@ end subroutine readreleasesB2
                       +tth(ix+1,jy+1,lower_theta_level:upper_theta_level,1)*ddx*ddy
              k=1
              do while (zpoint1(k)<tropoxy)
-               k=k+1
+                k=k+1
              enddo
              packet_len(tt)=packet_len(tt)+numpoint-k+1
              xtra1(numpart+1:numpart+numpoint-k+1)=xc
              ytra1(numpart+1:numpart+numpoint-k+1)=yc
-             ztra1(numpart+1:numpart+numpoint-k+1)=zpoint1(k:numpoint)
+             if (diabatic_w) then
+                ztra1(numpart+1:numpart+numpoint-k+1)=zpoint1(k:numpoint)
+             endif
              itra1(numpart+1:numpart+numpoint-k+1)=it
              itra0(numpart+1:numpart+numpoint-k+1)=it
              ! check that the interpolation range is Ok
@@ -2491,6 +2958,9 @@ end subroutine readreleasesB2
                         numpoint-k+1,-logpzp(k:numpoint),&
                         ttra1(numpart+1:numpart+numpoint-k+1))
              ! check interpolation errors generating negative temperatures
+             if (z_motion) then
+                ztra1(numpart+1:numpart+numpoint-k+1)= log(p0)-logpzp(k:numpoint)
+             endif
              if(minval(ttra1(numpart+1:numpart+numpoint-k+1))<=0) then
                print *,'ttra1 ',ttra1(numpart+1:numpart+numpoint-k+1)
                print *,'press_prof ',exp(log_press_prof)
@@ -2515,7 +2985,7 @@ end subroutine readreleasesB2
    close(tropunit)
    flush 6
  enddo doyy
- deallocate(buff,values,val_gauss,theta_g,theta_col,theta_inv_col)
+ deallocate(buff,values,val_gauss)
  open(unitpartout4,file=trim(path(2))//'sav_init',form='unformatted')
  write(unitpartout4) xtra1(1:numpart)
  write(unitpartout4) ytra1(1:numpart)
@@ -4174,10 +4644,219 @@ end subroutine readreleasesB2
 
   end subroutine fixparticlesClaus
 
+!===============================================================================
+!@@@@@@@@@@@@@@@@@@@@@@@@@@@ fixparticlesTBStratoClim @@@@@@@@@@@@@@@@@@@@@@@@@@
+!=====|==1=========2=========3=========4=========5=========6=========7=========8
 
-end module demar  
+  subroutine fixparticlesTBStratoClim(error)
+  use commons
+  use mass_iso
+
+  implicit none
+
+  !----- Declarations ---
+
+  ! Input :
+  !integer :: ibyeartrac, ibmonthtrac, ibdaytrac
+  !integer :: ibhourtrac, ibmintrac, ibsectrac
+  !integer :: Tbmax   ! brightness temperature threshold
+
+  ! Output :
+  logical :: error
+
+  ! Read :
+  !integer :: numpart
+
+  ! Only here :
+  integer, dimension(:), allocatable :: flagTB, ir_start
+  real, dimension(:), allocatable :: xpart, ypart, presspart, temppart
+  real, dimension(:), allocatable :: thetapart, zpart
+  character(26) :: filename
+  character(3)  :: Tbmax_string
+  integer :: ios
+  logical :: test_exist
+  integer :: ipart
+  integer :: nss(4),outofrange
+    !integer :: start_date, start_time
+  character(10) :: fulldate_cloudtop_string
+  
+  ! --- Init ---
+  error =.false.
+  nss(1:4)=0
+  outofrange=-2**30+1
+
+  !------ Define ---
+  write(Tbmax_string,'(i3)') TB_max
+
+  !fulldate_cloudtop = ibyeartrac*10**(6) + ibmonthtrac*10**(4) + ibdaytrac*10**2 + ibhourtrac
+  write(fulldate_cloudtop_string, '(i10)') fulldate_cloudtop
+  ! TBStratoClim_dir = '/data/atissier/flexpart_in/StratoClim+1km/'
+  filename = trim(fulldate_cloudtop_string)//'_TB'//Tbmax_string
+
+  ! --------------------------------------------
+  ! ----- First reading to determine numpart ---
+  ! --------------------------------------------
+
+  write(*,*) trim(TBStratoClim_dir)//filename
+
+  ! Check : file existence
+  inquire(file=trim(TBStratoClim_dir)//filename, exist=test_exist)
+  if(.NOT. test_exist) go to 9982
+
+  ! Read the file
+  open(UNIT=unitStratoClim, FILE=trim(TBStratoClim_dir)//filename, & 
+       FORM='unformatted', ACCESS="sequential", &
+       ACTION="read", POSITION="rewind", &
+       IOSTAT=ios)
+  if(ios /=0) go to 9962
+
+  ! Read the number of cloud top :
+  ! TODO ACCOUNT THAT THIS CAN BE COMBINED WITH PREVIOUS LIST OF PARCELS
+  read(UNIT=unitStratoClim, IOSTAT=ios) numpart
+  print *, 'numpart ',numpart
+  if(ios /=0) go to 9972
+
+  ! Allocation for the other variables
+  allocate(flagTB(numpart), ir_start(numpart))
+  allocate(xpart(numpart), ypart(numpart), presspart(numpart), temppart(numpart))
+  allocate(thetapart(numpart), zpart(numpart))
+
+  ! Read the other variables :•
+  ! longitude, latitude, pressure and temperature•
+  ! of the cloud tops :
+  read(UNIT=unitStratoClim, IOSTAT=ios) flagTB ! 1 for Meteosat, 2 for Himawari
+  if(ios /=0) go to 9972
+  read(UNIT=unitStratoClim, IOSTAT=ios) ir_start
+  if(ios /=0) go to 9972
+  read(UNIT=unitStratoClim, IOSTAT=ios) xpart
+  if(ios /=0) go to 9972
+  read(UNIT=unitStratoClim, IOSTAT=ios) ypart
+  if(ios /=0) go to 9972
+  read(UNIT=unitStratoClim, IOSTAT=ios) presspart
+  if(ios /=0) go to 9972
+  read(UNIT=unitStratoClim, IOSTAT=ios) temppart
+  if(ios /=0) go to 9972
+
+  close(UNIT=unitStratoClim)
+  
+  thetapart=temppart*(p0/presspart)**kappa
+  
+  ! do ipart = 1,numpart
+  !   write(*,*) ipart, xpart(ipart), ypart(ipart),
+  !   presspart(ipart)*10.**(-2), temppart(ipart)-273.15
+  ! enddo
+
+  ! Computing the time to release the particle•
+  !do ipart = 1,numpart  ! in forward calculation
+  !        start_date = ibyeartrac*10**(4) + ibmonthtrac*10**(2)  ibdaytrac
+  !        start_time = ibhourtrac*10**(4)
+  !        ir_start(ipart) = int((juldate(start_date, start_time)- bdate) * 86400.)
+  !enddo
+  
+  print *,'fixparticlesTBStratoClim stat lect'
+  print *,xlon0, ylat0, xlon0+(nx-1)*dx, ylat0+(ny-1)*dy
+  print *,minval(xpart),minval(ypart),maxval(xpart),maxval(ypart)
+  print *,maxval(presspart),minval(presspart),minval(thetapart),maxval(thetapart)
+
+  ! Longitude and discretization : (180 to 179 -> 0 to 360)
+  xpart = (xpart-xlon0)/dx
+
+  ! Discretization in latitude :
+  ypart = (ypart-ylat0)/dy
+
+  ! Vertical coordinate :
+  if(diabatic_StratoClim) then
+    ! Theta coordinates•
+    thetapart = temppart*(p0/presspart)**kappa
+  else
+    ! Z coordinates
+    zpart = log(p0/presspart)
+  endif
+
+  ! Copy in the final arrays :
+  do ipart = 1,numpart
+    xtra1(ipart) = xpart(ipart)
+    ytra1(ipart) = ypart(ipart)
+    itra1(ipart) = ir_start(ipart)
+    if (xtra1(ipart).lt.nearest(0.,-1.)) then 
+      nss(1)=nss(1)+1
+      itra1(ipart)=outofrange
+    else if (xtra1(ipart).ge.nearest(float(nx-1),1.)) then
+      nss(3)=nss(3)+1
+      itra1(ipart)=outofrange
+    else if (ytra1(ipart).lt.0.) then
+      nss(4)=nss(4)+1
+      itra1(ipart)=outofrange
+    else if (ytra1(ipart).gt.float(ny-1)) then
+      nss(2)=nss(2)+1
+      itra1(ipart)=outofrange
+    endif
+  enddo
+  print *,'numpart elim ',numpart,nss
+  if(diabatic_StratoClim) then
+    do ipart = 1, numpart
+      ztra1(ipart) = thetapart(ipart)
+    enddo
+  else
+    do ipart = 1, numpart
+      ztra1(ipart) = zpart(ipart)
+    enddo
+  endif
+  
+  !print *,'xtra1 ',xtra1(1:10)
+  !print *,'ytra1 ',ytra1(1:10)
+  !print *,'ztra1 ',ztra1(1:10)
+  !print *,'xmin xmax ',minval(xtra1(1:numpart)),maxval(xtra1(1:numpart))
+  !print *,'ymin ymax ',minval(ytra1(1:numpart)),maxval(ytra1(1:numpart))
+  !print *,'zmin zmax ',minval(ztra1(1:numpart)),maxval(ztra1(1:numpart))
+
+  ! Deallocate :
+  deallocate(flagTB, ir_start)
+  deallocate(xpart, ypart, presspart, temppart)
+  deallocate(thetapart, zpart)
+  
+  return ! Main subroutine : fixparticlesTBStratoClim
+
+  ! -------------------------------------------------
+  ! --- Error display for fixparticlesTBStratoClim---
+  ! -------------------------------------------------
+
+
+9962 error=.true.
+  write(*,*) '#####################################################'
+  write(*,*) '#### FLEXPART MODEL SUBROUTINE FIXPARTICLES      ####'
+  write(*,*) '####                                             ####'
+  write(*,*) '#### ERROR - FILE CANNOT BE OPENED               ####'
+  !write(*,*)
+  !'####'//trim(TBClaus_dir)//yearstring_short//'/'//filename//'
+  !####'
+  write(*,*) '#####################################################'
+  return
+
+9972 error=.true.
+  write(*,*) '#####################################################'
+  write(*,*) '#### FLEXPART MODEL SUBROUTINE FIXPARTICLES      ####'
+  write(*,*) '####                                             ####'
+  write(*,*) '#### ERROR WHILE READING THE FILE                ####'
+  ! write(*,*) '####
+  ! '//trim(TBClaus_dir)//yearstring_short//'/'//filename//'
+  ! ####'
+  write(*,*) '#####################################################'
+  return
+
+9982 error=.true.
+  write(*,*) '#####################################################'
+  write(*,*) '#### FLEXPART MODEL SUBROUTINE FIXPARTICLES      ####'
+  write(*,*) '####                                             ####'
+  write(*,*) '#### ERROR THIS FILE DOESN''T EXIST :            ####'
+  !write(*,*) '####
+  !'//trim(TBClaus_dir)//yearstring_short//'/'//filename//'
+  !####'
+  write(*,*) '#####################################################'
+  return
+  end subroutine fixparticlesTBStratoClim   
 
 !
 !=====|==1=========2=========3=========4=========5=========6=========7==
 !
-!$Log: 
+  end module demar
