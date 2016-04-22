@@ -1,6 +1,7 @@
 !**********************************************************************
-! Copyright 1996, i1997, 2001, 2002, 2006, 2007, 2012, 2013           *
-! Andreas Stohl, Bernard Legras, Ann'Sophie Tissier                   *
+! Copyright 1996, i1997, 2001, 2002, 2006, 2007, 2012, 2013, 2015     *
+! 2016                                                                * 
+! Andreas Stohl, Bernard Legras, Ignacio Pisso, Ann'Sophie Tissier    *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
 !                                                                     *
@@ -369,7 +370,7 @@ contains
           flush (6)
         endif
         
-        if(mod(itime,loutsav)==0) then
+        if((mod(itime,loutsav)==0).and.(itime/=itime0)) then
           call savsav(itime)
           if (track_kill)  call savkill(itime)
           if (track_cross) call savcross(itime)
