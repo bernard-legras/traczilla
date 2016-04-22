@@ -1,7 +1,6 @@
-
 !**********************************************************************
-! Copyright 2001, 2004, 2007, 2012, 2013           *
-! Bernard Legras                                       *
+! Copyright 2001, 2004, 2007, 2012, 2013, 2014                        *
+! Bernard Legras                                                      *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
 !                                                                     *
