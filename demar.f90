@@ -654,7 +654,8 @@ contains
     thetacut,           & ! potential temperature killing boundary
     setxylim,           & ! determine whether the box boundaries differ from default
     correct_vertwind,   & ! should not be here as it is already in the command file, maintained for compatibility
-    xlmin, xlmax, ylmin, ylmax ! box boundaries (in degree)
+    xlmin, xlmax, ylmin, ylmax, & ! box boundaries (in degree)
+    startfrom0            ! define that starting is made from part_000 file in 107 format
     
  namelist /CLAUS/       &
     Claus_dir,          & ! CLAUS directory
@@ -679,7 +680,7 @@ contains
     setxylim,           & ! determine whether the box boundaries deffer from default
     correct_vertwind,   & ! should not be here as it is already in the command file, maintained for compatibility
     xlmin, xlmax, ylmin, ylmax, &  ! box boundaries (in degree)
-    startfrom0             ! define that starting is made from part_000 file in 107 format
+    startfrom0            ! define that starting is made from part_000 file in 107 format
 
 ! Initialize logical variables
 !-----------------------------
