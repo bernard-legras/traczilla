@@ -1,0 +1,56 @@
+# traczilla
+FLEXPART fork that is adapted to massive calculations of high altitude trajectories
+
+This code has forked a long time ago from FLEXPART V5 and contains a large number of modifications, some of
+them which have been implemented also in more recent versions of FLEXPART
+
+Non exhaustive list
+- Execution driven by a COMMAND and a RELEASE file which are both namelists. The COMMAND file reads
+a variable that determines the plan to be executed. There is a namelist file for each type of plan which
+is read from RELEASE.
+- TRACZILLA is organised in functional blocks (not as a file for each routine like FLEXPART)
+- TRACZILLA is fully fortran 90
+- TRACZILLA does not interpolate to terrain following coordinates but directly from hybrid levels
+- TRACZILLA reads uses modern reanalysis: ERA-Interim, ERA5, MERRA and JRA-55
+- TRACZILLA is able to use spherical harmonics coefficints as input for winds
+- TRACZILLA has a large number of plans to release parcels from grids, balloon or aircraft trajectories, cloud top, ...
+It can also start from externally defined file defining the position and the launching time of parcels.
+- TRACZILLA is parallelized with OMP
+
+List of the main elements of the project
+
+TRACZILLA.f90: The main program that is analogous to the FLEXPART main programem module. It mainly performs tasks 
+of the launch sequence and then leaves timemanager running the code over the number of required time steps.
+
+advect.f90: Contains timemanager and advanceB. AdvanceB does the time stepping while timenager manages IOs and call 
+the interpolation routines. timenager contains a main externel loop on time and an internal loop on parcels. This latter 
+loop is parallelized using OMP.
+
+io.90: Does the IO for files containing parcel location. It does output at required time steps including the option of
+a rewritable file that contains the full image memory of parcel locations. It also reads file for restart or for runs 
+starting from an externally genaerated part_000 file.
+
+readinterpN.f90: Contains code that reads data from ECMWF native hybrid grid and performs interpolation of winds on this 
+grid to the location of parcels. It works currently with ERA-Interim and ERA5 data. The vertical velocities are desarchived 
+on a staggered grid and the interpolation differs from the other fields. The interpolar contained in this file is to be used
+when the vertical coordinate is pressure.
+
+isentrop.f90: Allows to calculate velocities from ECMWF data at given horizontal locations and fixed isentropic levels. Can be 
+used to perform transport on isentropic layers.
+
+ecmwf_diab.f90: Allows to read and handle diabatic heating rates from ECMWF at times staggered with respectto the horizontal 
+velocity data. Contains an interpolator to be used when the vertical coordinate is the potential temperature.
+
+merra.f90: Handles date from MERRA reanalysis in pressure coordinates including wind and diabatic heating rates. This module does 
+not work for MERRA-2.
+
+jra55.f90: Handles data from JRA-55 reanalysis in hybrid coordinates.
+
+ecmf_inct.f90: Uses the ECMWF assimilation increment to perform additional transport in the vertical.
+
+mass_iso.f90: Generates and apply a corrective velocity to impose mass conservation in diabatic runs.
+
+commons.f90: Manages the numerous common variables which are organzed as functional blocks.
+
+demar.f90: Handles the setup of the run. It contains a zillion of possible combinations, not of them having been tested. 
+
