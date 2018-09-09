@@ -479,7 +479,7 @@ module commons
       integer start_index, end_index, n_sample, n_loc
       character(len=48)::  MOZAIC_filename, ER2_day
       character(len=128):: MOZAIC_dir, ER2_dir
-      character(len=12):: index_type, campaign, instrument
+      character(len=12):: index_type, campaign, instrument, flight
       logical instant_release,interp_release
       real(dp) :: start_ER2time, end_ER2time
 

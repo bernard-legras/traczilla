@@ -655,7 +655,8 @@ contains
     setxylim,           & ! determine whether the box boundaries differ from default
     correct_vertwind,   & ! should not be here as it is already in the command file, maintained for compatibility
     xlmin, xlmax, ylmin, ylmax, & ! box boundaries (in degree)
-    startfrom0            ! define that starting is made from part_000 file in 107 format
+    startfrom0,         & ! define that starting is made from part_000 file in 107 format
+    flight                ! flight number to remove ambiguity when several flights in a day          
     
  namelist /CLAUS/       &
     Claus_dir,          & ! CLAUS directory
@@ -1047,6 +1048,7 @@ contains
  case('ER2')
     campaign='SOLVE'
     instrument='UCSE'
+    flight = ''
     ER2_dir='/user/legras/h4/NASA/SOLVE/er2'
     n_sample=1
     instant_release=.false.
@@ -1065,7 +1067,7 @@ contains
     numlevel(1) = n_loc           ! to perform correct output of n_loc
     print *,'readreleases> ER2'
     print *,'readreleases> ',campaign
-    print *,'readreleases> ',instrument
+    print *,'readreleases> ',instrument, flight
     print *,'readreleases> ',ER2_day
     print *,'readreleases> ',start_ER2time,end_ER2time
     print *,'readreleases> n_sample ',n_sample
@@ -3953,7 +3955,7 @@ end subroutine set_temp_for_press
  
  logical, intent(out):: error
  integer lhead, FDate, YYYY, MM, DD
- integer i,j,j1,nobs_prior,nGPSobs,maxj, iday, itime
+ integer i,j,j1,nobs_prior,nGPSobs,maxj, iday
  real diff_time, time
  real, allocatable :: buffer(:)
  
@@ -4001,8 +4003,8 @@ end subroutine set_temp_for_press
          !F_Alt(j)   = buffer(17)    
          j=j+1
        endif
-     enddo      
-120  continue
+     enddo
+ 120 continue         
      
    case ('GLORIA')
      print * ,trim(ER2_dir)//trim(ER2_day)//'_geolocations.dat-T'
@@ -4022,7 +4024,7 @@ end subroutine set_temp_for_press
      j=1
      maxj=nobs_prior ! to avoid an infinite loop
      do while (j<maxj+1)
-       read(unitER2_MM,*,err=997,end=140) iday,itime, buffer
+       read(unitER2_MM,*,err=997,end=130) iday,itime, buffer
        time = 3600*int(itime/10000)+60*modulo(int(itime/100),100)+modulo(itime,100)
        if(buffer(4) > 450) then
          cycle
@@ -4034,8 +4036,54 @@ end subroutine set_temp_for_press
          F_Tout(j)  = buffer(5)
          j=j+1 
        endif 
-     enddo 
-140  continue
+     enddo
+ 130 continue    
+
+case ('BAL')
+     print * ,trim(ER2_dir)//trim(ER2_day)//'_1_balloon'//trim(flight)//'.nas'
+     open(unitER2_MM,file=trim(ER2_dir)//trim(ER2_day)//'_1_balloon'//trim(flight)//'.nas', &
+         status='OLD',err=997,FORM='FORMATTED')
+     read(unitER2_MM,*) lhead
+     ! make buffer the size of the line to be read
+     allocate (buffer(17))
+     do i=2,6
+       read(unitER2_MM,*)
+     enddo
+     read(unitER2_MM,*) YYYY, MM, DD
+     do i=8,lhead
+       read(unitER2_MM,*)
+     enddo
+     FDate=10000*YYYY + 100*MM + DD
+     print *,'fixM55> ',FDate,juldate(FDate,000000),bdate
+     diff_time = end_ER2time - start_ER2time
+     ! allocate for 1Hz observations with a 5% margin  
+     nobs_prior=int(1.05_dp*diff_time)
+     allocate (UTC(nobs_prior),F_Pstat(nobs_prior),F_Tout(nobs_prior))
+     allocate (F_Lat(nobs_prior),F_Lon(nobs_prior))
+     j=1
+     maxj=100000 ! to avoid an infinite loop
+     do while (j<maxj)
+       read(unitER2_MM,*,err=997,end=140) time, buffer
+       if(time .le. start_ER2time-0.9999_dp) then
+         cycle
+       else if (time .ge. end_ER2time+0.9999_dp) then
+         exit
+       else
+         UTC(j)   = time
+         F_Tout(j)  = buffer(1)+273.15
+         F_Pstat(j) = buffer(2) ! in hPa
+         if ((buffer(13)>990).or.(buffer(14)>990)) then
+           F_lat(j) = F_lat(j-1)
+           F_lon(j) = F_lon(j-1)
+         else
+           F_Lat(j)   = buffer(13)
+           F_Lon(j)   = buffer(14)
+         endif
+         j=j+1
+       endif
+     enddo
+ 140 continue
+
  end select
  
  close(unitER2_MM)
