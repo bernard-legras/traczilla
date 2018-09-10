@@ -4070,8 +4070,17 @@ case ('BAL')
          exit
        else
          UTC(j)   = time
-         F_Tout(j)  = buffer(1)+273.15
-         F_Pstat(j) = buffer(2) ! in hPa
+         ! eliminate points above the pressure low cut
+         if(buffer(2) <= 0.01*plowcut) cycle
+         ! replace missing PTU data
+         if (buffer(1)>990) then
+           F_Tout(j) = F_tout(j-1)
+           F_Pstat(j) = F_Pstat(j-1)           
+         else
+           F_Tout(j)  = buffer(1)+273.15 ! conversion from Celsius
+           F_Pstat(j) = buffer(2) ! in hPa
+         endif
+         ! replace missing GPS data
          if ((buffer(13)>990).or.(buffer(14)>990)) then
            F_lat(j) = F_lat(j-1)
            F_lon(j) = F_lon(j-1)
