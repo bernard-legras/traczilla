@@ -98,11 +98,11 @@ $(OBJECTS1): $(OBJECTS0) $(OBJECTS2)
 clean:
 	\rm *.o 
 	\rm *.mod  
-	ln -s ~/local/include/grib_api.mod
-	ln -s ~/local/include/netcdf.mod
+	ln -s $(HOME)/local/include/grib_api.mod
+	ln -s $(HOME)/local/include/netcdf.mod
 lnmod:
-	ln -s ~/local/include/grib_api.mod
-	ln -s ~/local/include/netcdf.mod
+	ln -s $(HOME)/local/include/grib_api.mod
+	ln -s $(HOME)/local/include/netcdf.mod
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
 #$Log: 
