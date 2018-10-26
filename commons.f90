@@ -125,7 +125,7 @@ module commons
 ! Maximum number of particles, species, wind fields and similar
 !**************************************************************
 
-      integer, parameter :: maxpart=1000000,maxpoint=50,maxspec=1
+      integer, parameter :: maxpart=25000000,maxpoint=50,maxspec=1
 !     integer, parameter :: maxpart=3000000,maxpoint=50,maxspec=1
       integer, parameter :: maxwf=150000,maxtable=1000,numclass=9,ni=11
 
