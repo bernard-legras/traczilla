@@ -705,6 +705,9 @@ contains
  ylmax = float(ny-1)
  setxylim = .false.
 
+! Initialization default index origin
+!------------------------------------
+ idx_orgn = 1
    
 ! Open the releases file and read user options
 !---------------------------------------------
@@ -2373,7 +2376,11 @@ end subroutine set_temp_for_press
       epsil =  1.e-4 ; epsil2=1.e-7
 
       allocate (itra0(maxpart))
-      
+      if (.not.allocated(xtra1)) then
+         allocate(xtra1(maxpart),ytra1(maxpart),ztra1(maxpart))
+         allocate(itra1(maxpart))
+      endif
+
       numpart=0 
       print *,'numpoint ',numpoint
       print *,'path',path(2)
