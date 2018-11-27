@@ -1877,9 +1877,8 @@ contains
 
 ! Calculation of z_factor
 ! Estimation of temperature near the particle
-   tint =                                                   &
-          (tth(ix,jy,indz(1,1),1)*(log(pint)-log(prp(1,1 )))   &
-        + tth(ix ,jy ,indz(1,1)+1,1)*(log(pr(1,1))-log(pint))) &
+   tint = (tth(ix,jy,indz(1,1),1)*(log(pint1)-log(prp(1,1 )))   &
+        + tth(ix ,jy ,indz(1,1)+1,1)*(log(pr(1,1))-log(pint1))) &
         / (log(pr(1,1))-log(prp(1,1)))
    select case (diftype)      
      case (1)          ! diffusion in z
