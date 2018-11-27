@@ -296,6 +296,7 @@ module commons
       real (dp) :: lev1,lev2,inclev
       real (dp) :: uppertheta
       real (dp) :: pcut, plowcut, thetacut, thetalowcut
+      real (dp) :: sigma_cut
       
       integer :: npart(maxpoint)
       character(len=12):: release_plan
@@ -315,6 +316,11 @@ module commons
 ! nspec                   number of different species allowed for one release
 ! species                 name of species
 ! link                    index referring each species to the species table
+! pcut                    high pressure cutoff
+! lowcut                  low pressure cutoff
+! thetacut                low potential tempearture cutoff
+! thetalowcut             high potential temperature cutoff
+! sigma_cut               high sigma cutoff
 
 !******************************************************************************
 ! Variables associated with the ECMWF meteorological input data ("wind fields")
