@@ -519,7 +519,7 @@ contains
 ! If trajectory is terminated, do not increment its time
 !=======================================================
           ifnstop: if (nstop>1) then 
-            if(j==1) print *,'choix nstop>1'          
+            !if(j==1) print *,'choix nstop>1'          
             npstop_thread(nstop)=npstop_thread(nstop)+1
             if(sortie>0) npsortie_thread(sortie)=npsortie_thread(sortie)+1                                
 !             TEST    
@@ -941,6 +941,8 @@ contains
             nstop=4
           elseif (p0*exp(-z) < plowcut) then
             nstop=5
+          elseif (p0*exp(-z) > sigma_cut*psaver) then
+            nstop=6
           endif 
         else
           press = p0 * (tint/z)**(1/kappa) 

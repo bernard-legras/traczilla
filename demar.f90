@@ -681,7 +681,8 @@ contains
     setxylim,           & ! determine whether the box boundaries deffer from default
     correct_vertwind,   & ! should not be here as it is already in the command file, maintained for compatibility
     xlmin, xlmax, ylmin, ylmax, &  ! box boundaries (in degree)
-    startfrom0            ! define that starting is made from part_000 file in 107 format
+    startfrom0,         & ! define that starting is made from part_000 file in 107 format
+    sigma_cut             ! defines the sigma value to cut the trajectory at the bottom (default 1)
 
 ! Initialize logical variables
 !-----------------------------
@@ -696,6 +697,7 @@ contains
  track_kill=.false.
  track_cross=.false.
  startfrom0 = .false.           ! only used in StratoClim plan
+ sigma_cut = 1.
 
 ! Initialize box boundaries
 !--------------------------
@@ -1061,7 +1063,7 @@ contains
     n_loc=0
     savfull=.true.
     thetacut = 800._dp
-    pcut=1000._dp
+    pcut=100000._dp
     plowcut=0._dp
     setxylim = .false.
     read(unitreleases,ER2)
@@ -1142,7 +1144,7 @@ contains
     TB_max = 230
     fulldate_cloudtop=2016032900
     thetacut = 380._dp
-    pcut=25000._dp
+    pcut=100000._dp
     plowcut=0._dp
     NearRealTime=.false.
     NearRealTimeShiftHours = -18
@@ -1165,6 +1167,11 @@ contains
     ! this generates an error in the io code which is looking for idxcross
     if(.not.NearRealTime .and. nb_halfdays_in_batch==0 .and. ldirect==1 .and. .not.restart) M10=.true. 
 
+    if(.not.z_motion .and. (sigma_cut<1.)) then
+      print *,'INCONSISTENT CHOICE OF SIGMA_CUT WITH DIABATIC MOTION'
+      stop
+    endif
+
     if (M10) then
       print *,'BEWARE THAT M10 RUNS CANNNOT BE RESTARTED '
     endif
@@ -1177,6 +1184,7 @@ contains
     print *,'readreleases> diabatic_StratoClim ', diabatic_StratoClim
     print *,'readreleases> TB_max ',TB_max
     print *,'readreleases> thetacut ',thetacut
+    print *,'readreleases> sigma_cut ',sigma_cut
     print *,'readreleases> pcut plowcut ',pcut,plowcut
     print *,'readreleases> NearRealTime ',NearRealTime
     print *,'readreleases> NearRealTimeShiftHours ',NearRealTimeShiftHours
