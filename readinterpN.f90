@@ -1259,7 +1259,7 @@ contains
      if(u_bot) then
        tt2(nx-1,:,1,n)=tt2(0,:,1,n)
        u10(nx-1,:,1,n)=u10(0,:,1,n)
-       u10(nx-1,:,1,n)=u10(0,:,1,n)
+       v10(nx-1,:,1,n)=v10(0,:,1,n)
      endif  
      uuh(nx-1,:,:,n)=uuh(0,:,:,n)
      vvh(nx-1,:,:,n)=vvh(0,:,:,n)        
