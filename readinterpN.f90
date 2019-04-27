@@ -1286,6 +1286,11 @@ contains
        theta_col(:,:,n)=.false.
        theta_inv_col(:,:,n)=.false.
        print *,'readwind > NOCOL'
+#if defined (PAR_RUN)
+       print *,'Running parallel code with one processor may induce fp errors'
+       print *,'if calc_col_theta is not run.'
+       print *,'Do not do it unless you know what you are doing.'
+#endif
      else
 !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(i,j)
        do j=0,ny-1
