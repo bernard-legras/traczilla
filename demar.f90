@@ -682,7 +682,8 @@ contains
     correct_vertwind,   & ! should not be here as it is already in the command file, maintained for compatibility
     xlmin, xlmax, ylmin, ylmax, &  ! box boundaries (in degree)
     startfrom0,         & ! define that starting is made from part_000 file in 107 format
-    sigma_cut             ! defines the sigma value to cut the trajectory at the bottom (default 1)
+    sigma_cut,          & ! defines the sigma value to cut the trajectory at the bottom (default 1)
+    shuffling             ! activate shuffling of parcels in timemanager
 
 ! Initialize logical variables
 !-----------------------------
