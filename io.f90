@@ -599,7 +599,7 @@ contains
 !                                                                              *
 !*******************************************************************************
 
-      integer :: i1,i2,if,i,j,jseg,nbuf
+      integer :: i1,i2,if,i,j,jseg,nbuf,shift
       integer :: ibdate_arch,ibtime_arch,lhead,outfmt,nact
       integer (kind=4), allocatable:: itra(:),idx(:),flag(:)
       real (kind=4), allocatable:: xyz(:,:)
@@ -844,35 +844,53 @@ contains
           xyz(3,:)=xyz(4,:)*(p0/xyz(3,:))**kappa      
         endif
         itra1(:)=HUGE(1)
+        shift = 1 - idx_orgn
         do i=1,nact
-          flagTB(idx(i))=flag(i)
-          !itra0(idx(i))=itra(i)
-          !itra1(idx(i))=itime0
-          xtra1(idx(i))=(xyz(1,i)-xlon0)/dx
-          ytra1(idx(i))=(xyz(2,i)-ylat0)/dy
-          ttra1(idx(i))=xyz(4,i)
-          ztra1(idx(i))=xyz(3,i)
+          flagTB(idx(i)+shift)=flag(i)
+          !itra0(idx(i)+shift)=itra(i)
+          !itra1(idx(i)+shift)=itime0
+          xtra1(idx(i)+shift)=(xyz(1,i)-xlon0)/dx
+          ytra1(idx(i)+shift)=(xyz(2,i)-ylat0)/dy
+          ttra1(idx(i)+shift)=xyz(4,i)
+          ztra1(idx(i)+shift)=xyz(3,i)
         enddo
         print *,'x ',minval(xyz(1,:)),maxval(xyz(1,:))
         print *,'y ',minval(xyz(2,:)),maxval(xyz(2,:))
+        ! test whether there are some values of xtra1 outside limits
+        ! and repair if we are in the global domain
+        if ((minval(xtra1)<0).or.(maxval(xtra1)>=float(nx-1))) then
+          if (.not.xglobal) then
+            print *,'ACHTUNG restart with invalid longitudes'
+            stop 255
+          else
+            print *,'restart with longitudes using other origin'
+            xtra1 = modulo(xtra1,real(nx-1,kind(0._dp)))
+          endif
+        endif
+            
         ! If we are in a run starting from part_000 
         ! itra1 should be equal to itra0      
         ! In a restart run, the active parcels are
         ! all to be initialized at the same time.
+        ! since they have been saved only if they were active.
         ! ACHTUNG: This produces wrong results if there 
-        ! are still parcels to be launched, e.g. M10 
+        ! are still parcels to be launched, e.g. M10
         ! runs 
-        if (startfrom0) then
+        ! The test on hrstart makes sure this is used only at 0 time
+        ! (actually, the startfrom0 flag is somewhat superfluous)
+        if (startfrom0.and.(hrstart==0)) then
           do i=1,nact
-            itra1(idx(i))=itra(i)
+            itra1(idx(i)+shift)=itra(i)
+            itra0(idx(i)+shift)=itra(i)
           enddo
         else 
           do i=1,nact
-            itra1(idx(i))=itime0
+            itra1(idx(i)+shift)=itime0
           enddo  
           print *,'ACHTUNG ACHTUNG ACHTUNG ACHTUNG ACHTUNG'
           print *,'Beware that restarting this way  you have lost all'
           print *,'the parcels still to be launched in that run'
+          print *,'itra0 lost as well'
         endif 
         deallocate (xyz,itra,idx,flag)  
       end select
