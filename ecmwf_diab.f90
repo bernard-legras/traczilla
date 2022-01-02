@@ -604,7 +604,7 @@ end subroutine alloc_ecmwf_diab
         read(unitpath,'(a)',err=998) path_diab(i) 
         len_diab(i)=index(path_diab(i),' ')-1
       enddo
-
+      
       close(unitpath)
       return    
 
