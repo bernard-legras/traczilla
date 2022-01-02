@@ -1,6 +1,6 @@
 !**********************************************************************
 ! Copyright 1996, i1997, 2001, 2002, 2006, 2007, 2012, 2013, 2015     *
-! 2016                                                                * 
+! 2016, 2020                                                                * 
 ! Andreas Stohl, Bernard Legras, Ignacio Pisso, Ann'Sophie Tissier    *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
@@ -37,6 +37,7 @@ use ecmwf_inct
 use mass_iso
 use merra
 use jra55
+use era5
 use combin
 use io
 use demar
@@ -153,9 +154,7 @@ contains
 !        print *,j-numpart-1,shuffle(1:5)
 !        print *,minval(shuffle),maxval(shuffle)
       endif
-      
-      !print *,'jra logical variables ',jra55_data,jra55_diab
-      
+           
       if (TTLactiv.or.CLAUSactiv) then
 ! Allocate arrays for temperature and saturation mixing ratio
         print *,'timemanager> allocate ttra1 and qtra1'
@@ -225,6 +224,8 @@ contains
 !===========================================
         if(iso_mass) then
           call getfields_iso(itime,nerr)
+        else if (era5_data) then
+          call getfields_era5(itime,nerr)
         else if (merra_data) then     
           call getfields_merra(itime,nerr)
         else if (jra55_data) then
@@ -309,6 +310,8 @@ contains
                   tropofile=trim(tropodir)//'tropo-theta-MERRA-'//yyyy//'.bin'
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-theta-JRA-'//yyyy//'.bin'
+               else if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-theta-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'          
                endif
@@ -317,6 +320,8 @@ contains
                   tropofile=trim(tropodir)//'tropo-Z-MERRA-'//yyyy//'.bin'
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-Z-JRA-'//yyyy//'.bin'
+               else if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-Z-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-Z-EI-'//yyyy//'.bin'          
                endif           
@@ -454,7 +459,7 @@ contains
 
 ! Integrate advection equation for lsynctime seconds
 !===================================================
-          if (merra_diab.or.jra55_data) tint=ttra1(j)
+          if (merra_diab.or.jra55_data.or.era5_data) tint=ttra1(j)
             !if(debug_out) &
             !  print "(' timemanager> particle ',i6,2X,3G12.5)",&
             !     j,xtra1(j),ytra1(j),ztra1(j)
@@ -488,8 +493,7 @@ contains
             if(ztra1(j)<tropozdd(ix,jy)*(1-ddx)*(1-ddy) &
                        +tropozdd(ix+1,jy)*ddx*(1-ddy) &
                        +tropozdd(ix,jy+1)*(1-ddx)*ddy &
-                       +tropozdd(ix+1,jy+1)*ddx*ddy) nstop=6
-            if (itra0(j)-itime > max_life_time) nstop=7
+                       +tropozdd(ix+1,jy+1)*ddx*ddy) nstop=6           
             if (nstop >=6 .and. track_kill) then
               it_kill(j)=itime
               nstop_kill(j)=nstop
@@ -504,6 +508,10 @@ contains
               if(ztra1(j)>2300 .and. it_2300(j)==0) it_2300(j)=itime
             endif                       
           endif
+          
+! Test for parcel exceeding maximum age, max_life_age initialized to 
+! very large values if not used
+          if (abs(itra0(j)-itime) > max_life_time) nstop=7
 
 ! Calculate qv for final pressure and initial temperature
 ! Copy tint in ttra1
@@ -738,7 +746,14 @@ contains
         !if(debug_out) print *,'(u,v,w,tint)    > ',u,v,w*86400,tint
       elseif (jra55_data) then
         call interpol_wind_jra55(itime,x,y,z,u,v,w,ngrid, &
-           theta_inf,theta_sup,psaver,z_factor,tint,nstop)       
+           theta_inf,theta_sup,psaver,z_factor,tint,nstop)
+      elseif (era5_data) then
+        call interpol_wind_era5(itime,x,y,z,u,v,w,ngrid, &
+           theta_inf,theta_sup,psaver,z_factor,tint,nstop) 
+      ! beware that this is only z_motion for the kinematic case of the
+      ! ECMWF data in the standard EN format and processing w in the 
+      ! staggered grid
+      ! kinematic case for jra55 and era5 is already treated above         
       elseif (z_motion) then
         call interpol_windB(itime,x,y,z,u,v,w,ngrid, &
            psaver,z_factor,tint)
@@ -765,7 +780,7 @@ contains
       !  print*,p0*exp(-z),w*dt,z,psaver
       !endif
 !     diabatic trajectories with w in K/s
-      if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data.or.jra55_data)) &
+      if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data.or.jra55_data.or.era5_data)) &
          z=z+w*dt*float(ldirect)
       if(iso_mass .and. mass_diabat)  z=z+w*dt*float(ldirect)
 
@@ -789,7 +804,7 @@ contains
         endif
       endif
       
-! Projects sonto the frontier if going above or below
+! Projects onto the frontier if going above or below
 !====================================================
 
       !if(debug_out) print*,'z, zmax, psaver',z,zmax,psaver    
@@ -799,7 +814,7 @@ contains
          if (z.lt.log(p0/psaver)) z=2*log(p0/psaver)-z ! bouncing
       endif
       if (theta_bounds) then
-         if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab.or.jra55_diab)) &
+         if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab.or.jra55_diab.or.era5_diab)) &
             z=max(min(z,theta_sup),theta_inf)
          if (mass_diabat) &
             z=max(min(z,ThetaLev(NbTheta)),ThetaLev(1))
@@ -864,6 +879,7 @@ contains
           endif
       else if (jra55_data)  then
           ! (90-ylat0)/dy=0.7675033...     1-0.7675033...=0.23249669...
+          ! no reason to extend that to era5
           if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.-0.767504).or. &
               (y.gt.float(ny)-0.232497).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
              nstop=3
@@ -875,18 +891,25 @@ contains
              endif
           endif
       else if (setxylim) then
-          if (x.lt.nearest(xlmin,-1.)) then 
-            nstop=3
-            sortie=1
-          else if (x.ge.nearest(xlmax,1.)) then
-            nstop=3
-            sortie=3
-          else if (y.lt.ylmin) then
+          if (y.lt.ylmin) then
             nstop=3
             sortie=4
           else if (y.gt.ylmax) then
             nstop=3
             sortie=2
+          else if (xlmin<xlmax) then
+            if (x.lt.nearest(xlmin,-1.)) then 
+              nstop=3
+              sortie=1
+            else if (x.ge.nearest(xlmax,1.)) then
+              nstop=3
+              sortie=3
+            endif
+          else
+            if ((x.ge.nearest(xlmax,1.)).and.(x.lt.nearest(xlmin,-1.))) then
+              nstop=3
+              sortie=1
+            endif
           endif
           ! abandon this test as it interfers with boxing above in StratoClim
           ! plan
