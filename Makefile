@@ -4,7 +4,7 @@
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
-TARGET=X64-par-ng
+TARGET=X64-ng
 #TARGET=win
 HOME=/home/legras
 
@@ -41,7 +41,7 @@ ifeq ($(TARGET),X64-par)
   # include needed for netcdf.mod
   FFLAGS = -I$(HOME)/local/include -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
   #FFLAGS = -I$(HOME)/local/include -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds
-  LDFLAGS1 = -rpath $(HOME)/local/lib.x64 -L$(HOME)/local/lib.x64 -lcom -lnetcdf -lnetcdff
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lcom -lnetcdff -lnetcdf -leccodes_f90 -leccodes 
 endif
 ifeq ($(TARGET),X64-par-ng)
   MAIN = TRACZILLA-TT-par-ng
@@ -61,7 +61,7 @@ ifeq ($(TARGET),X64-ng)
   FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -Munixlogical -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
   #FFLAGS = -I$(HOME)/local/include -g -Ktrap=inv,divz,ovf -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo
   #LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
-  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -leccodes_f90 -leccodes 
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lcom -lnetcdff -lnetcdf -leccodes_f90 -leccodes 
 endif
 ifeq ($(TARGET),win)
   MAIN = TRACZILLA-win
@@ -83,7 +83,7 @@ endif
 #
 OBJECTS0 = commons.mod date.mod coord.mod thermo.mod randme.mod io.mod interpol.mod\
 isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterpN.mod\
-sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod jra55.mod combin.mod \
+sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod jra55.mod era5.mod combin.mod \
 demar.mod advect.mod
 
 OBJECTS1 =  TRACZILLA.o
@@ -100,9 +100,11 @@ clean:
 	\rm *.mod  
 	ln -s $(HOME)/local/include/grib_api.mod
 	ln -s $(HOME)/local/include/netcdf.mod
+	ln -s $(HOME)/local/include/eccodes.mod
 lnmod:
 	ln -s $(HOME)/local/include/grib_api.mod
-	ln -s $(HOME)/local/include/netcdf.mod
+	ln -s $(HOME)/local/include/netcdcf.mod
+	ln -s $(HOME)/local/include/eccodes.mod
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
 #$Log: 
