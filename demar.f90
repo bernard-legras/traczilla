@@ -1,5 +1,5 @@
 ! *********************************************************************
-! Copyright  1996,2002,2004, 2007, 2012, 2013, 2014, 2016             *
+! Copyright  1996,2002,2004, 2007, 2012, 2013, 2014, 2016, 2020             *
 ! Andreas Stohl, Bernard Legras, Ann'Sophie Tissier                   *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
@@ -81,6 +81,7 @@ contains
  use mass_iso
  use merra
  use jra55
+ use era5
  use readinterpN, only : ecmwf_data 
  
  character(len=72):: line
@@ -144,6 +145,8 @@ contains
    merra_diab,          & ! merra heating rates
    jra55_data,          & ! jra55 winds
    jra55_diab,          & ! jra55 heating rates
+   era5_data,           & ! era5 winds
+   era5_diab,           & ! era5 heating rates
    ecmwf_netcdf,        & ! ECMWF data are in netcdf4 format
    hour_accu              ! number of hours in the ECMWF accumulations
    
@@ -222,6 +225,8 @@ contains
  merra_diab=.false.
  jra55_data=.false.
  jra55_diab=.false.
+ era5_data=.false.
+ era5_diab=.false.
  ecmwf_data=.true.
  data_source='EI'
  ecmwf_netcdf=.false.
@@ -251,6 +256,8 @@ contains
    data_source='JRA55'
  else if (merra_data) then
    data_source='MERRA'
+ else if (era5_data) then
+   data_source='ERA5'
  endif
  
  select case (release_plan)
@@ -325,8 +332,9 @@ contains
  print *,'readcommand > z_motion ',z_motion
  print *,'readcommand > isentropic_motion ',isentropic_motion
  print *,'readcommand > diabatic_w ',diabatic_w
- print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
- print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
+ if (merra_data) print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
+ if (jra55_data) print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
+ if (era5_data) print *,'readcommand > era5_data n _diab ',era5_data,era5_diab 
  print *,'readcommand > ecmwf_data _diabatic_w ',ecmwf_data,ecmwf_diabatic_w 
  print *,'readcommand > correct_vertwind ',correct_vertwind
  print *,'readcommand > clear_sky ',clear_sky
@@ -683,7 +691,8 @@ contains
     xlmin, xlmax, ylmin, ylmax, &  ! box boundaries (in degree)
     startfrom0,         & ! define that starting is made from part_000 file in 107 format
     sigma_cut,          & ! defines the sigma value to cut the trajectory at the bottom (default 1)
-    shuffling             ! activate shuffling of parcels in timemanager
+    shuffling,          & ! activate shuffling of parcels in timemanager
+    max_life_time         ! maximum life time in days
 
 ! Initialize logical variables
 !-----------------------------
@@ -699,6 +708,10 @@ contains
  track_cross=.false.
  startfrom0 = .false.           ! only used in StratoClim plan
  sigma_cut = 1.
+ 
+! Initialize max_life_time to a large value but not too large to avoid 
+! overflow when converted to seconds
+max_life_time=BIG_INT
 
 ! Initialize box boundaries
 !--------------------------
@@ -829,7 +842,7 @@ contains
     track_kill=.true.
     track_cross=.true.
     numpoint=1
-    theta_l=0.
+    theta_l=0._dp
     thetacut=10000._dp
     max_life_time=10
     make_uni3D=.false.
@@ -845,6 +858,7 @@ contains
     mesh_size_lat=2._dp 
     mesh_size_long=3._dp
     n_sample=1
+    max_life_time = 1000
     read(unitreleases,AGEB)
     write(6,AGEB)
     ! convert max_life_time from year to s
@@ -1161,6 +1175,8 @@ contains
     ! release but this should be corrected
     correct_vertwind=.false.
     
+    max_life_time = 1000
+    
     read(unitreleases, StratoClim)
     !try to guess this is an M10 run
     !allows to set M10 as input when nb_halfdays_in_batch > 0 
@@ -1192,6 +1208,10 @@ contains
     print *,'readreleases> M10 ',M10
     print *,'readreleases> nb_halfdays_in_batch ',nb_halfdays_in_batch
     print *,'readreleases> correct_vertwind ',correct_vertwind
+    
+    
+    ! convert max_life_time from day to s
+    max_life_time=floor(86400._dp*max_life_time)
     
  case default
    error=.true.
@@ -1558,6 +1578,7 @@ subroutine set_temp_for_theta(error)
   use readinterpN, only : ecmwf_data
   use jra55, only : jra55_data
   use merra, only : merra_data,merra_diab 
+  use era5, only : era5_data
   
   logical, intent(out):: error
   real(dp), allocatable :: logzp(:),logpzp(:),mtab(:)
@@ -1605,9 +1626,9 @@ subroutine set_temp_for_theta(error)
       p1=rddx*rddy     ;  p2=ddx*rddy
       p3=rddx*ddy      ;  p4=ddx*ddy
       ! Calculate theta column on adjacent points
-      ! Works for both JRA55 and ERA-Int
+      ! Works for ERA5, JRA55 and ERA-Int
       ! For MERRA, replace by calc_col_theta_merra (CHECK)
-      if (jra55_data.or.ecmwf_data) then      
+      if (era5_data.or.jra55_data.or.ecmwf_data) then      
          call calc_col_theta(ix,jy,1)
          call calc_col_theta(ix+1,jy,1)
          call calc_col_theta(ix,jy+1,1)
@@ -1618,7 +1639,7 @@ subroutine set_temp_for_theta(error)
          return  
       endif   
       ! Calculate pressure column 
-      ! Works for both JRA55 and ERA-Int
+      ! Works for ERA5, JRA55 and ERA-Int
       ! For MERRA, just use the fixed pressure levels
       ! psaver in Pascal
       psaver=ps(ix,jy,1,1)*(1-ddx)*(1-ddy) + ps(ix+1,jy,1,1)*(1-ddx)*ddy &
@@ -1686,6 +1707,7 @@ subroutine set_temp_for_press(error)
   use readinterpN, only : ecmwf_data
   use jra55, only : jra55_data
   use merra, only : merra_data 
+  use era5, only:era5_data
   
   logical, intent(out) :: error
   real(dp), allocatable :: logzp(:)
@@ -1731,7 +1753,7 @@ subroutine set_temp_for_press(error)
       p3=rddx*ddy      ;  p4=ddx*ddy
       
       ! Calculate pressure column 
-      ! Works for both JRA55 and ERA-Int
+      ! Works for ERA5, JRA55 and ERA-Int
       ! For MERRA, just use the fixed pressure levels
       ! psaver in Pascal
       psaver=ps(ix,jy,1,1)*(1-ddx)*(1-ddy) + ps(ix+1,jy,1,1)*(1-ddx)*ddy &
@@ -2631,6 +2653,8 @@ end subroutine set_temp_for_press
        tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//yyyy//'.bin'
      case ('JRA55')
        tropofile=trim(tropodir)//'/tropo-theta-JRA-'//yyyy//'.bin'
+     case ('ERA5')
+       tropofile=trim(tropodir)//'/tropo-theta-ERA5-'//yyyy//'.bin'
    end select  
    open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
    if(mod(yy,4)==0) then
@@ -2779,7 +2803,8 @@ end subroutine set_temp_for_press
 !     23 March 2015
 !     from the previous version of fixmultilayer_tropomask
 !     designed for jra-55, cannot be used for other reanalysis 
-!     at the moment                                                                       *
+!     at the moment 
+!     Could be easily adapted for ERA5                                                                      *
 !    
 !                                                                              *
 !*******************************************************************************
@@ -2889,6 +2914,8 @@ end subroutine set_temp_for_press
        tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//year//'.bin'
      case ('JRA55')
        tropofile=trim(tropodir)//'/tropo-theta-JRA-'//year//'.bin'
+     case ('ERA5')
+       tropofile=trim(tropodir)//'/tropo-theta-ERA5-'//year//'.bin'
    end select
    open(tropunit,file=tropofile,access='direct',status='old',recl=4*ny*nx)
    if(mod(yy,4)==0) then
