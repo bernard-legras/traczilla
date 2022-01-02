@@ -71,6 +71,7 @@ contains
       open(unitpath,file=pathfile,status='old',err=999)
       print *,' opening pathfile ',pathfile
 
+      ! read the first 4 lines of the path file into the list of strings path
       do i=1,numpath
         read(unitpath,'(a)',err=998) path(i) 
         len_path(i)=len_trim(path(i))
