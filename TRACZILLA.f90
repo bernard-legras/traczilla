@@ -1,7 +1,7 @@
 
 !**********************************************************************
 ! Copyright 1996, 1997, 2001, 2002, 2006, 2007, 2012, 2013, 2015,     * 
-! 2016                                                                *
+! 2016, 2020                                                                *
 ! Andreas Stohl, Bernard Legras                                       *
 !                                                                     *
 ! This file is part of TRACZILLA which is derived from FLEXPART V6    *
@@ -117,10 +117,15 @@
 ! other list descriptions of diabatic heating
 ! Notice that iso_mass runs do not use this procedure (not a good idea)
 
+      ! read the available file localized in path(4)
       call readavailable(error)
       if(error) goto 999
+      ! in case of a diabatic run, load the two last paths and the 
+      ! available_diab file
+      ! readpaths_diab and readavailable_diab are part of ecmwf_diab
+      ! but serve the other cases (MERRA, JRA-55, ERA5)
       if(diabatic_w .and. & 
-        (ecmwf_diabatic_w.or.merra_diab.or.jra55_diab) ) then
+        (ecmwf_diabatic_w.or.merra_diab.or.jra55_diab.or.era5_diab) ) then
         call readpaths_diab(pathfile,error)
         call readavailable_diab(error)
         if (error) goto 999
@@ -130,6 +135,7 @@
         call readavailable_inct(error)
         if (error) goto 999
       endif
+      flush 6
       
 ! Read the model grid specifications of the current model run
 !************************************************************
@@ -137,10 +143,12 @@
       if(iso_mass) then
 ! binary input format made by genesis
         call gridcheck_iso(error)
+      else if (era5_data) then
+        call gridcheck_era5(error)
       else if (merra_data) then
         call gridcheck_merra(error)
       else if (jra55_data) then
-        call gridcheck_jra55(error)
+        call gridcheck_jra55(error)     
       else
 ! standard FLEXPART wind grib files
         call gridcheck(oronew,error)
@@ -154,6 +162,7 @@
       if (ecmwf_inct_w.and.mass_correction) call diab_mass_inct_init
       if (merra_diab.and.mass_correction) call diab_mass_merra_init
       if (jra55_diab.and.mass_correction) call diab_mass_jra55_init
+      if (era5_diab.and.mass_correction) call diab_mass_era5_init
 
 ! Read the parameters of the release plan defined in COMMAND
 !***********************************************************
@@ -314,6 +323,8 @@
         call alloc_merra
       else if (jra55_data) then
         call alloc_jra55
+      else if (era5_data) then
+        call alloc_era5
       else
          print *,'alloc_3D uuh vvh tth uupol vvpol ps tt2 u10 v10'
          allocate (uupol(0:nx-1,0:ny-1,nuvz_b:nuvz,2),vvpol(0:nx-1,0:ny-1,nuvz_b:nuvz,2))
