@@ -37,7 +37,7 @@ use isentrop_h ! needs upper_theta_layer
 implicit none
 private :: locpj
 private :: NbLon, NbLat, NbHLat, NbLev
-private :: idx_uvwt, idx_ps, idx_hr
+private :: idx_uvwt, idx_hr
 private :: current_year,current_year_hr,current_ym,current_ym_hr
 
 logical, save :: era5_data, era5_diab
@@ -154,12 +154,12 @@ end subroutine alloc_era5
    use coord
    use eccodes
    logical, intent(out) :: error
-   integer :: i,ifn,ll
+   integer :: ifn,ll
    real(dbl) :: xaux1,xaux2,xaux3
    real(dp) :: yfirst,ylast,xlast,ylat1
    real(dp) :: sizesouth,sizenorth
    
-   integer :: vvv, lat
+   integer :: vvv
    integer :: DateSize, TimeSize, ParamSize, LevelSize
    character(len=8), allocatable :: DateList(:),ParamList(:)
    character(len=4), allocatable :: TimeList(:)
@@ -265,9 +265,9 @@ end subroutine alloc_era5
   call codes_get_real8(igrib,'longitudeOfFirstGridPointInDegrees',xaux1,iret)
   call codes_get_real8(igrib,'longitudeOfLastGridPointInDegrees',xaux2,iret)
   call codes_get_real8(igrib,'iDirectionIncrementInDegrees',xaux3,iret)
-  xlon0=xaux1
-  xlast=xaux2
-  dx=xaux3
+  xlon0=real(xaux1,kind=dp)
+  xlast=real(xaux2,kind=dp)
+  dx=real(xaux3,kind=dp)
   dx=1._dp ! correcting inaccurate value read from file
   dxconst=180._dp/(dx*r_earth*pi)
   !if (xlon0 > 180._dp) xlon0=xlon0-360._dp
@@ -318,6 +318,9 @@ end subroutine alloc_era5
   dy = (ylat1-ylat0)/(NbLat-1)
   dyconst = 180._dp/(dy*r_earth*pi)
   print *,'ylat0 dy ',ylat0,dy
+  
+! Set zmaxzmax=-log(akm(nwz)/p0) 
+  zmax = -log(akz(nwz)/p0)
     
 ! Check whether the grid is global and whether the poles are included 
  
@@ -451,8 +454,8 @@ data bb  / &
   endif
   
   ! beware: akz is multiplied per p0 in gridcheck
-  akz=aa
-  bkz=bb
+  akz=real(aa,kind=dp)
+  bkz=real(bb,kind=dp)
   
   
   
@@ -550,7 +553,6 @@ data bb  / &
 ! No wind fields, which can be used, are currently in memory 
 ! -> read both wind fields
 !***********************************************************
-
          do indj=indmin,numbwf-1
             if ((ldirect*wftime(indj).le.ldirect*itime).and.   &
                   (ldirect*wftime(indj+1).gt.ldirect*itime)) then      
@@ -583,7 +585,6 @@ data bb  / &
 ! 2nd part
 ! Check, if heating rate fields are available for the current time step
 !**************************************************************
-
       ifdiab: if (era5_diab) then
 
         if ((ldirect*wftime_diab(1).gt.ldirect*itime).or.    &
@@ -718,8 +719,8 @@ data bb  / &
   use eccodes
   integer, intent(in) :: indj,n
   integer :: ll,hh
-  integer :: l,lat,i,err_loc 
-  character (len=2) :: hour,month
+  integer :: l,lat
+  character (len=2) :: month
   character (len=4) :: year
   character (len=6) :: yearmonth
   character (len=8) :: fulldate
@@ -827,31 +828,25 @@ data bb  / &
   enddo
   if(xglobal) ps(NbLon,0:NbLat-1,1,n) = ps(0,0:NbLat-1,1,n)
   deallocate(values)
-!!$OMP SECTION
 ! Vertical Dp/Dt
-!  if (z_motion) then
+  if (z_motion) then
 !    call codes_index_select(idx_uvwt(4),'mars.date',fulldate)
 !    call codes_index_select(idx_uvwt(4),'mars.time',hh)
-!    call codes_index_select(idx_uvwt(4),'mars.param','39.200')
-!    do l=1,NbLev
-!       call codes_index_select(idx_uvwt(4),'mars.levelist',l)
-!       call codes_new_from_index(idx_uvwt(4),igrib_thread, iret)
-       !** call codes_get_real4_array(igrib_thread,'values',values)        
-       !** val_gauss=reshape(values,(/Nblon,Nblat/))
-!       call codes_get_real4_array(igrib_thread,'values',values(:,5))
-!       call codes_release(igrib_thread)
-!       val_gauss(:,:,5)=reshape(values(:,5),(/NbLon,NbLat/))   
-!       do lat=1,Nblat
-          !** wwh(0:NbLon-1,NbLat-lat,l,n) = w1(lat)*val_gauss(1:NbLon,g1(lat)) &
-          !**                               +w2(lat)*val_gauss(1:NbLon,g2(lat))
-!          wwh(0:NbLon-1,NbLat-lat,l,n) = w1(lat)*val_gauss(1:NbLon,g1(lat),5) &
-!                                        +w2(lat)*val_gauss(1:NbLon,g2(lat),5)
-!       enddo
-!       if(xglobal) wwh(NbLon,0:NbLat-1,l,n) = wwh(0,0:NbLat-1,l,n)
-!    enddo
-!    deallocate(values,val_gauss) 
-!  endif	
-				
+    call codes_index_select(idx_uvwt,'mars.param',135)
+    do l=1,NbLev
+       call codes_index_select(idx_uvwt,'mars.levelist',l)
+       call codes_new_from_index(idx_uvwt,igrib, iret)
+       call codes_get_real4_array(igrib,'values',values)        
+       vals=reshape(values,(/Nblon,Nblat/))
+       call codes_release(igrib)
+       do lat=1,NbLat
+         wwh(0:NbLon-1,NbLat-lat,Nblev-l+1,n) = vals(:,lat)        
+       enddo
+       if(xglobal) wwh(NbLon,0:NbLat-1,Nblev-l+1,n) = wwh(0,0:NbLat-1,Nblev-l+1,n)
+       deallocate(values)
+    enddo
+  endif
+
   deallocate(vals) 
   
   return
@@ -899,8 +894,8 @@ data bb  / &
   use eccodes
   integer, intent(in) :: indj,n
   integer :: ll,hh,step
-  integer :: l,lat,i,err_loc
-  character (len=2) :: hour,month
+  integer :: l,lat
+  character (len=2) :: month
   character (len=4) :: year
   character (len=6) :: yearmonth
   character (len=8) :: fulldate
@@ -983,8 +978,10 @@ data bb  / &
 
 ! north pole region
   if (nglobal) then
+#if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED) 
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(ix,jy,iz,xlon,ylat)
+#endif
         do ix=0,nx-1
           xlon=xlon0+float(ix)*dx
           do jy=int(switchnorthg)-2,ny-1
@@ -996,14 +993,18 @@ data bb  / &
             enddo
           enddo
         enddo
+#if defined(PAR_RUN)
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
   endif
 
 !    south pole region
   if (sglobal) then
+#if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED) 
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(ix,jy,iz,xlon,ylat)
+#endif
         do ix=0,nx-1
           xlon=xlon0+float(ix)*dx
           do jy=0,int(switchsouthg)+3
@@ -1015,8 +1016,10 @@ data bb  / &
             enddo
           enddo
         enddo
+#if defined(PAR_RUN)
 !$OMP ENDDO
 !$OMP END PARALLEL
+#endif
   endif
   
   return
@@ -1033,7 +1036,9 @@ data bb  / &
 
 ! No conversion needed as data are in K/s
 ! Conversion in D theta / D t
-!$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(iz,jy,ix,pp)      
+#if defined(PAR_RUN)
+!$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(iz,jy,ix,pp)
+#endif      
   do iz=1,nuvz
      do jy=0,ny-1
         do ix=0,nx-1
@@ -1044,7 +1049,9 @@ data bb  / &
      ! The nex statement is missing in jra_55 file
      if (xglobal) wwh(NbLon,0:NbLat-1,1:NbLev,n) = wwh(0,0:NbLat-1,1:NbLev,n)
   enddo
+#if defined(PAR_RUN)
 !$OMP END PARALLEL DO
+#endif
   !print *,'wwh just read, max, min ',maxval(maxval(wwh(:,:,35,n),DIM=2),DIM=1),&
   !                                   minval(minval(wwh(:,:,35,n),DIM=2),DIM=1)     
         
@@ -1089,21 +1096,27 @@ data bb  / &
   allocate(flux(0:nx-1,0:ny-1,nuvz))
   allocate(flux_lat(0:ny-1,nuvz))
   allocate(mean_sigma_lat(0:ny-1,nuvz))
-  
+
+#if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED)
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
+#endif
 ! Calculation of the potential temperature
   do k=nuvz-NPureP_era5,nuvz
      theta(:,:,k)=0.5*(tth(:,:,k,1)+tth(:,:,k,2))*pif_era5(k)
 !    theta(:,:,k)=0.5*(theta_g(:,:,k,1)+theta_g(:,:,k,2))
   enddo
+#if defined(PAR_RUN)
 !$OMP END DO
 
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
+#endif
   do k=nuvz-NPureP_era5+1,nuvz-1
      sigma(:,:,k)=pmc_era5(k)/(theta(:,:,k+1)-theta(:,:,k-1))
   enddo
+#if defined(PAR_RUN)
 !$OMP END DO
+#endif
   sigma(:,:,nuvz)=pmc_era5(nuvz)/(theta(:,:,nuvz)-theta(:,:,nuvz-1))
   
 ! Calculation of the mass flux across the surface
@@ -1112,7 +1125,9 @@ data bb  / &
   !allocate(flux(0:nx-1,0:ny-1))
   !allocate(flux_lat(0:ny-1))
   !allocate(mean_sigma_lat(0:ny-1))
+#if defined(PAR_RUN)
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(k)
+#endif
   do k=nuvz-NPureP_era5+1,nuvz
      flux(:,:,k)=wwh(:,:,k,n)*sigma(:,:,k)
      flux_lat(:,k)=sum(flux(0:nx-2,:,k),DIM=1)
@@ -1121,9 +1136,13 @@ data bb  / &
      mean_sigma(k)=0.5*dot_product(mean_sigma_lat(:,k),area_coefft_era5)
      mean_w(k)=mass_flux(k)/mean_sigma(k)
   enddo
+#if defined(PAR_RUN)
 !$OMP END DO
+#endif
   !deallocate(flux,flux_lat,mean_sigma_lat)
+#if defined(PAR_RUN)
 !$OMP END PARALLEL
+#endif
   deallocate(flux,flux_lat,mean_sigma_lat) 
 
 ! Output of the averaged diab heating
@@ -1134,12 +1153,15 @@ data bb  / &
   endif
 
 ! Correction step
+#if defined(PAR_RUN)
 !$OMP PARALLEL DO SCHEDULE(DYNAMIC) PRIVATE(k)
+#endif
   do k=nuvz-NPureP_era5+1,nuvz
     wwh(:,:,k,n)=wwh(:,:,k,n)-mean_w(k)
   enddo
+#if defined(PAR_RUN)
 !$OMP END PARALLEL DO
-
+#endif
   deallocate(theta,sigma,mean_sigma)
   deallocate(mass_flux,mean_w)
 
@@ -1271,8 +1293,13 @@ subroutine interpol_wind_era5 &
       ! min and max required for the points just falling on the boundary
       ! as it may happen typically as a result of initialization
       
-      if(xglobal) ix=modulo(floor(xt),nx-1)       
-      jy=max(min(floor(yt),ny-1),-1)
+      
+      if(xglobal) then 
+        ix=modulo(max(floor(xt),0),nx-1)
+      else
+        ix=min(max(floor(xt),0),nx-2)
+      endif
+      jy=min(max(floor(yt),0),ny-2)
       ddx=modulo(xt-float(ix),1.)
       ! accounts for the two polar regions in era5
       ! the case should not occur for EI since 0 <= yt <= ny-1
