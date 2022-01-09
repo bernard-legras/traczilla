@@ -280,9 +280,9 @@ end subroutine alloc_jra55
   call grib_get_real8(igrib,'longitudeOfFirstGridPointInDegrees',xaux1,iret)
   call grib_get_real8(igrib,'longitudeOfLastGridPointInDegrees',xaux2,iret)
   call grib_get_real8(igrib,'iDirectionIncrementInDegrees',xaux3,iret)
-  xlon0=xaux1
-  xlast=xaux2
-  dx=xaux3
+  xlon0=real(xaux1,kind=dp)
+  xlast=real(xaux2,kind=dp)
+  dx=real(xaux3,kind=dp)
   dx=0.5625_dp ! correcting inaccurate value read from file
   dxconst=180._dp/(dx*r_earth*pi)
   if (xlon0 > 180._dp) xlon0=xlon0-360._dp
@@ -328,8 +328,8 @@ end subroutine alloc_jra55
   allocate(y_gauss(NbHLat),w_gauss(NbHLat),ylat_gauss(NbLat))
   call gauleg(y_gauss,w_gauss)
   do lat=1,NbHLat
-    ylat_gauss(NbHLat+lat)=y_gauss(lat)
-    ylat_gauss(NbHlat+1-lat)=-y_gauss(lat)
+    ylat_gauss(NbHLat+lat)=real(y_gauss(lat),kind=dp)
+    ylat_gauss(NbHlat+1-lat)=real(-y_gauss(lat),kind=dp)
   enddo
 ! Calculation of the interpolation coefficients for the regular grid
 ! from the Gaussian grid 
@@ -466,8 +466,8 @@ end subroutine alloc_jra55
     stop
   endif
   
-  akz=aa
-  bkz=bb
+  akz=real(aa,kind=dp)
+  bkz=real(bb,kind=dp)
   
   return
   end subroutine setabl
@@ -912,8 +912,8 @@ end subroutine alloc_jra55
        if(xglobal) wwh(NbLon,0:NbLat-1,l,n) = wwh(0,0:NbLat-1,l,n)
     enddo
     deallocate(values,val_gauss) 
-  endif	
-				
+  endif
+
 !$OMP END PARALLEL SECTIONS
 
   deallocate(values,val_gauss,STAT=err_loc)
@@ -1392,7 +1392,14 @@ subroutine interpol_wind_jra55 &
       ! min and max required for the points just falling on the boundary
       ! as it may happen typically as a result of initialization
       
-      if(xglobal) ix=modulo(floor(xt),nx-1)       
+      if(xglobal) then 
+        ix=modulo(floor(xt),nx-1)
+      else
+         ix=max(min(floor(xt),nx-2),0)
+      endif
+      ! ACHTUNG: CHECK THAT THESE BOUNDS ARE CORRECT FOR jy
+      ! IS IT REALLY CORRECT TO GET jy=-1 OR jy=ny-1 AT THE POLES
+      ! DUE TO THE GAUSSIAN LATITUDES²
       jy=max(min(floor(yt),ny-1),-1)
       ddx=modulo(xt-float(ix),1.)
       ! accounts for the two polar regions in JRA55
