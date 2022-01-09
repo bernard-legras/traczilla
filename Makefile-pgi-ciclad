@@ -1,0 +1,70 @@
+#$Id:
+#
+#=======================================================================
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+TARGET=X64-par-ng
+HOME=/home/legras
+
+SHELL = /bin/bash
+FC       = pgf95
+CC	= pgcc
+
+ifeq ($(TARGET),X64-par-ng)
+  MAIN = TRACZILLA-TT-par-ng
+  CC = pgcc
+  CFLAGS = -mp -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Msmartalloc
+  # include needed for netcdf.mod
+  FFLAGS = -I$(HOME)/local-ng/include -Mpreprocess -DPAR_RUN -mp -Munixlogical -Mextend -byteswapio -tp x64 -O2 -fastsse -Minfo -Mcache_align -Msmartalloc -Ktrap=inv,divz,ovf
+  #FFLAGS = -I$(HOME)/local-ng/include -Mbounds -Mpreprocess -DPAR_RUN -mp -Mextend -byteswapio -tp x64 -O2 -Minfo -Ktrap=inv,divz,ovf
+  #FFLAGS = -mp -Mextend -byteswapio -tp x64 -fastsse -O2 -Minfo -Mbounds 
+  #LDFLAGS = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lcom -lnetcdff -lnetcdf -leccodes_f90 -leccodes 
+endif
+ifeq ($(TARGET),X64-ng)
+  MAIN = TRACZILLA-TT-ng
+  CC = pgcc
+  CFLAGS = -fastsse -tp x64 -O2 -Minfo -Minline -Ktrap=inv,divz,ovf  -Mcache_align -Msmartalloc
+  FFLAGS = -I$(HOME)/local/include -Mpreprocess -Mextend -Munixlogical -byteswapio -tp x64 -fastsse -O2 -Minfo -Minline -Ktrap=inv,divz,ovf -Mcache_align -Msmartalloc
+  #FFLAGS = -I$(HOME)/local/include -g -Ktrap=inv,divz,ovf -Mbounds -Mpreprocess -Mextend -byteswapio -tp x64 -O2 -Minfo
+  #LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lgribex -lcom -lnetcdff -lnetcdf -L${HOME}/local-ng/grib_api/lib -lgrib_api_f90 -lgrib_api 
+  LDFLAGS1 = -rpath $(HOME)/local-ng/lib.x64 -L$(HOME)/local-ng/lib.x64 -lcom -lnetcdff -lnetcdf -leccodes_f90 -leccodes 
+endif
+
+.SUFFIXES :	.f90
+
+.f90.mod:
+	        $(FC) $(FFLAGS) -c $<
+
+.f90.o:
+	$(FC) $(FFLAGS) -c $<
+
+#
+OBJECTS0 = commons.mod date.mod coord.mod thermo.mod randme.mod io.mod interpol.mod\
+isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterpN.mod\
+sphereharmspe.mod mass_iso.mod ecmwf_inct.mod merra.mod jra55.mod era5.mod combin.mod \
+demar.mod advect.mod
+
+OBJECTS1 =  TRACZILLA.o
+
+OBJECTS2 = misc.o 
+
+$(MAIN): $(OBJECTS0) $(OBJECTS1) $(OBJECTS2)
+	$(FC) *.o -o $(MAIN) $(FFLAGS) $(LDFLAGS1)
+$(OBJECTS1): $(OBJECTS0) $(OBJECTS2)
+
+.PHONY : clean
+clean:
+	\rm *.o 
+	\rm *.mod  
+	ln -s $(HOME)/local/include/grib_api.mod
+	ln -s $(HOME)/local/include/netcdf.mod
+	ln -s $(HOME)/local/include/eccodes.mod
+lnmod:
+	ln -s $(HOME)/local/include/grib_api.mod
+	ln -s $(HOME)/local/include/netcdcf.mod
+	ln -s $(HOME)/local/include/eccodes.mod
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+#$Log: 
