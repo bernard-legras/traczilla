@@ -677,7 +677,7 @@ contains
   
  namelist /StratoClim/  &
     TBStratoClim_dir,   & ! StratoClim directory
-    diabatic_Stratoclim,& ! if .true., theta levels; if .false. z levels
+    diabatic_StratoClim,& ! if .true., theta levels; if .false. z levels
     TB_max,             & ! maximum brightness temperature (Kelvin) of the released parcels
     pcut,               & ! max pressure threshold to stop trajectories (Pa)
     plowcut,            & ! min pressure threshold to stop trajectories (Pa)
@@ -4208,9 +4208,11 @@ case ('BAL')
  enddo
  itra0(:) = itra1(:)
  if (z_motion) then
-   flagTB(:) = Z'3E'
+   !flagTB(:) = Z'3E'
+   flagTB(:) = 62
  else
-   flagTB(:) = Z'7E'
+   !flagTB(:) = Z'7E'
+   flagTB(:) = 126
  endif 
  print *,minval(itra1),maxval(itra1) 
  print *,minval(xtra1),maxval(xtra1)
@@ -5505,8 +5507,8 @@ case ('BAL')
         real_date=dble(stamp_date)/10000._dbl+0.1_dbl
         if (floor(real_date)/=fulldate_cloudtop) then
            write(*,*) 'fixparticlesmultiTBStratoClim ERROR'
-           write(*,*),'stamp_date does not match name for first file' 
-           write(*,*),stamp_date,fulldate_cloudtop
+           write(*,*) 'stamp_date does not match name for first file'
+           write(*,*) stamp_date,fulldate_cloudtop
            error=.true.
            return
         endif
