@@ -386,7 +386,7 @@ contains
           if (track_kill)  call savkill(itime)
           if (track_cross) call savcross(itime)
           flush (6)
-        endif                           
+        endif
   
 ! Calculate Lyapunov exponents: TO BE UPDATED WITH I. PISSO CODE
 ! deactivated by default
@@ -428,14 +428,20 @@ contains
         if(trace_time) print *,'itime > ',itime
 
 ! Beginning of the parallel section
+#if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED) SHARED(npproc,npsortie,nb_bounce,npstop,shuffle,itime) &
 !$OMP PRIVATE(npproc_thread,nb_bounce_thread,npstop_thread,num_thread,npsortie_thread)
+#endif
         npproc_thread=0
         nb_bounce_thread=0
         npstop_thread(:)=0
         npsortie_thread(:)=0
+#if defined(PAR_RUN)
         num_thread=OMP_GET_THREAD_NUM()
 !$OMP DO SCHEDULE(RUNTIME) PRIVATE(i,j,dt,tint,sortie,nstop,ix,jy,ddx,ddy)
+#else
+        num_thread=1
+#endif
         dopart: do i=1,numpart
           if (shuffling) then
              j=shuffle(i)
@@ -536,11 +542,14 @@ contains
 !             itra1(j)=-999999999 
             if(allocated(flagTB)) then
                if(nstop==4) then
-                 flagTB(j) = ior(flagTB(j),Z'2000')
+                 !flagTB(j) = ior(flagTB(j),Z'2000')
+                 flagTB(j) = ior(flagTB(j),8192)
                elseif(nstop==5) then
-                 flagTB(j) = ior(flagTB(j),Z'4000')
+                 !flagTB(j) = ior(flagTB(j),Z'4000')
+                 flagTB(j) = ior(flagTB(j),16384)
                elseif(nstop==3) then
-                 flagTB(j) = ior(flagTB(j),Z'4000'+sortie*Z'2000')
+                 !flagTB(j) = ior(flagTB(j),Z'4000'+sortie*Z'2000')
+                 flagTB(j) = ior(flagTB(j),16384+sortie*8192)
                endif  
             endif   
           elseif (nstop<0) then ifnstop
@@ -554,9 +563,11 @@ contains
 
         enddo dopart                      ! end of loop over particles
 
+#if defined(PAR_RUN)
 !$OMP END DO
 
 !$OMP CRITICAL
+#endif
 ! Collect counts
 !=============== 
         npproc=npproc+npproc_thread
@@ -564,12 +575,14 @@ contains
         npstop(:)=npstop(:)+npstop_thread(:)
         npsortie(:)=npsortie(:)+npsortie_thread(:)
         npproc=npproc-sum(npstop_thread)
+#if defined(PAR_RUN)
 !$OMP END CRITICAL
         !print *,'THREAD ',num_thread,' completed itime ',itime 
         !print *,npproc,npproc_thread
         !print *,npstop_thread
         !print *,npsortie_thread
 !$OMP END PARALLEL
+#endif
  
         if (mod(itime,loutprint)==0) then
           call system_clock(count_clock_2,count_rate,count_max)        
@@ -577,15 +590,15 @@ contains
              npproc, nb_bounce, float(count_clock_2-count_clock_1)/       &
              float(count_rate), 's'
           write(*,'(a,7i8)') ' timemanager> npstop   ',npstop
-          if (sum(npsortie>0)) write(*,'(a,i8,a,i8,a,i8,a,i8,a)') &
+          if (sum(npsortie)>0) write(*,'(a,i8,a,i8,a,i8,a,i8,a)') &
                ' timemanager> npsortie ',npsortie(1),':W',npsortie(2), &
                ':N',npsortie(3),':E',npsortie(4),':S' 
           allocate (mask_part(numpart))
           mask_part(:) = itra1(:)==itime+lsynctime
-          if(sum(int(mask_part))>0) then
+          if(any(mask_part)) then
             minz=minval(ztra1(1:numpart),DIM=1,MASK=mask_part)
             maxz=maxval(ztra1(1:numpart),DIM=1,MASK=mask_part)
-            meanz=sum(ztra1(1:numpart),DIM=1,MASK=mask_part)/sum(int(mask_part))
+            meanz=sum(ztra1(1:numpart),DIM=1,MASK=mask_part)/count(mask_part)
             write(*,'(A,3F12.6,2I10)')' ztra1 ',minz,maxz,meanz,&
               minloc(ztra1(1:numpart),DIM=1,MASK=mask_part), &
               maxloc(ztra1(1:numpart),DIM=1,MASK=mask_part)
@@ -600,7 +613,8 @@ contains
           
           if(iso_mass) then                 
              mask_part(:) = mask_part(:) .and. (ztra1(:) .ge. ThetaLev(NbTheta))
-             print*,'# hanged ',sum(transfer(mask_part,1,size=size(mask_part)))
+             !print*,'# hanged ',sum(transfer(mask_part,1,size=size(mask_part)))
+             print *,'# hanged ',count(mask_part)
           endif
           deallocate (mask_part)
           npstop(:)=0
@@ -701,7 +715,11 @@ contains
       !debug_out=.false.  
 
       ! get thread number, must be one if no parallel run 
+#if defined(PAR_RUN)
       num_thread=OMP_GET_THREAD_NUM()
+#else
+      num_thread=1
+#endif
       if (num_thread==0) num_thread=1
       !if (modulo(jp,20000).eq.0) then
       !  print *, num_thread
@@ -775,6 +793,7 @@ contains
 ! Calculate vertical position at time step itime+lsynctime
 !==========================================================
 !     kinematic trajectories with w in Pa/s
+
       if(z_motion) z=z-w*dt*float(ldirect)/(p0*exp(-z))
       !if(z_motion.and.debug_out) then
       !  print*,p0*exp(-z),w*dt,z,psaver
