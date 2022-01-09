@@ -1,22 +1,6 @@
 #include "ieeeftn.h"
 
 #if STDC
-LOGICAL isinf(REAL *x)
-#else /* NOT STDC */
-LOGICAL isinf(x)
-REAL *x;
-#endif /* STDC */
-{
-    REAL_PARTS w;
-
-    w.r = *x;
-    return (((GET_EXPONENT_SP(w.i) == EXPONENT_INFNAN_SP) &&
-	     (SIGNIFICAND_SP(w.i) == 0))
-	    ? _TRUE_ : _FALSE_);
-}
-#include "ieeeftn.h"
-
-#if STDC
 LOGICAL isnan(REAL *x)
 #else /* NOT STDC */
 LOGICAL isnan(x)
@@ -31,6 +15,23 @@ REAL *x;
 #else
     return ((*x != *x) ? _TRUE_ : _FALSE_);
 #endif
+}
+
+#if STDC
+LOGICAL
+isinf(REAL *x)
+#else /* NOT STDC */
+LOGICAL
+isinf(x)
+REAL *x;
+#endif /* STDC */
+{
+    REAL_PARTS w;
+
+    w.r = *x;
+    return (((GET_EXPONENT_SP(w.i) == EXPONENT_INFNAN_SP) &&
+	     (SIGNIFICAND_SP(w.i) == 0))
+	    ? _TRUE_ : _FALSE_);
 }
 /*
    quicksort.c
