@@ -149,7 +149,7 @@ real function satratio(press,temp)
 
       real, intent(in) :: p,t         ! Pressure (Pascal)
                                       ! Temperature (K)
-      real :: f_esl, f_esi
+      !real :: f_esl, f_esi
 
 !      IF ( t.ge.273.15 ) THEN      ! for water
       IF ( t.ge.253.15 ) THEN      ! modification Petra Seibert
