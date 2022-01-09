@@ -326,7 +326,9 @@ contains
    
    subroutine gridcheck_nc(oronew,error)
    logical, intent(out) :: error, oronew
-   ! TO BE DONE
+   print *,'NOT YET IMPLEMENTED'
+   error = .true.
+   oronew = .false.
    end subroutine gridcheck_nc  
 
    subroutine gridcheck_grb(oronew,error)
@@ -393,22 +395,21 @@ contains
    use coord
    use grib_api
    logical, intent(out) :: error, oronew
-   integer :: ix,jy,i,ifn,ifield,j,k,numskip
+   integer :: i,ifn,ifield,j,k,numskip
    integer :: kumin,kumax,kwmin,kwmax
    real (kind=4) :: xaux1,xaux2,yaux1,yaux2
    real (kind=8) :: xaux1in,xaux2in,yaux1in,yaux2in
-   real :: sizesouth,sizenorth,xauxa,pint
+   real :: sizesouth,sizenorth,xauxa
 
 ! VARIABLES AND ARRAYS NEEDED FOR GRIB DECODING
 
    integer :: ifile, iret, igrib, gotGrid
    integer :: gribVer,typSurf,parId,parLev,nbVert,pvsize
-   integer, allocatable :: inbuff(:)
    real (kind=4), allocatable:: zsec4(:), pv(:)
    character(len=24) :: gribErrorMsg = 'Error reading grib file'
    character(len=20) :: gribFunction = 'gridcheck'
 
-   error=0
+   error=.false.
 !
    if(ideltas.gt.0) then
      ifn=1
@@ -509,10 +510,10 @@ contains
 
         ! Nominal number of half-levels in the full resolution grid
         nlev_ec=nbVert/2-1
-        xaux1=xaux1in
-        xaux2=xaux2in
-        yaux1=yaux1in
-        yaux2=yaux2in
+        xaux1=real(xaux1in,kind=dp)
+        xaux2=real(xaux2in,kind=dp)
+        yaux1=real(yaux1in,kind=dp)
+        yaux2=real(yaux2in,kind=dp)
         if (xaux1.gt.180.) xaux1=xaux1-360.0
         if (xaux2.gt.180.) xaux2=xaux2-360.0
         if (xaux1.lt.-180.) xaux1=xaux1+360.0
@@ -978,6 +979,7 @@ contains
 
    subroutine readwind_nc(indj,n)
    integer, intent(in):: indj,n
+   print *,'Function not yet implemented',indj,n
    end subroutine readwind_nc 
    
    subroutine readwind_grb(indj,n)
@@ -1034,12 +1036,12 @@ contains
    use grib_api
 
    integer, intent(in):: indj,n
-   integer :: i,j,k,levdiff2,ifield,lunit
+   integer :: i,j,k,levdiff2
 
 ! VARIABLES AND ARRAYS NEEDED FOR GRIB DECODING
 
-   integer :: parLev, paramSize, parId, countv
-   integer :: nxf, nyf, nlevf
+   integer :: parLev, paramSize, countv
+   !integer :: nxf, nyf, nlevf
    integer :: idx, igrib, iret, off_bot
    real(kind=4), allocatable :: zsec4(:)
    character(len=24) :: gribErrorMsg = 'Error reading grib file'
@@ -1278,21 +1280,26 @@ contains
 !       declared in the PBS preamble
 !       This is just inducing a waste of resources which can be significant
 !       when parcels are within a localized cloud
+#if defined(PAR_RUN)
 !$OMP PARALLEL
 !$OMP MASTER
      num_threads=OMP_GET_NUM_THREADS()
 !$OMP END MASTER
 !$OMP END PARALLEL
+#else
+     num_threads=1
+#endif
      if(num_threads==1) then 
        theta_col(:,:,n)=.false.
        theta_inv_col(:,:,n)=.false.
        print *,'readwind > NOCOL'
-#if defined (PAR_RUN)
+#if defined(PAR_RUN)
        print *,'Running parallel code with one processor may induce fp errors'
        print *,'if calc_col_theta is not run.'
        print *,'Do not do it unless you know what you are doing.'
 #endif
      else
+#if defined(PAR_RUN)
 !$OMP PARALLEL DO DEFAULT(SHARED) SCHEDULE(DYNAMIC) PRIVATE(i,j)
        do j=0,ny-1
          do i=0,nx-1
@@ -1300,6 +1307,7 @@ contains
          enddo
        enddo
 !$OMP END PARALLEL DO
+#endif
      endif
    endif
 
@@ -1655,6 +1663,7 @@ contains
 !*************************************************************************
    
    ix=min(floor(xt),nx-2)       ;  jy=min(floor(yt),ny-2)
+   if (xglobal) ix=modulo(floor(xt),nx-1)
    ixp=ix+1         ;  jyp=jy+1
    ddx=modulo(xt-float(ix),1.) ;  ddy=yt-float(jy)
    rddx=1.-ddx      ;  rddy=1.-ddy
