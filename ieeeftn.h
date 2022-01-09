@@ -134,6 +134,7 @@ typedef long INTEGER;
 
 typedef int LOGICAL;	/* use int, not long, to avoid conflicts on HP-UX with */
 			/* system header file declarations of isinf(), isnan() */
+
 typedef union
 {
     REAL r;
