@@ -34,7 +34,9 @@ module ecmwf_diab
 
 use commons
 use isentrop_m
+#if defined(ECMWF_NC)
 use netcdf
+#endif
 implicit none
 
 logical, save :: ecmwf_diabatic_w
@@ -246,12 +248,15 @@ end subroutine alloc_ecmwf_diab
 
       subroutine read_diab(indj,n)
       integer, intent(in):: indj,n
-      
+#if defined(ECMWF_NC)
       if (ecmwf_netcdf) then 
         call read_diab_nc(indj,n)
       else 
         call read_diab_grb(indj,n)
       endif
+#else
+      call read_diab_grb(indj,n)
+#endif
       
       return
       end subroutine read_diab
@@ -293,7 +298,7 @@ end subroutine alloc_ecmwf_diab
       integer, intent(in):: indj,n
       
       integer :: count1, count2
-      integer :: iret, idx, igrib, ifield
+      integer :: iret, idx, igrib
       integer :: nxf, nyf, nlevf
       integer :: i,j,k, off_bot
       integer :: parLev, paramSize, par1, par2
@@ -460,8 +465,10 @@ end subroutine alloc_ecmwf_diab
       return
       end subroutine read_diab_grb
  
+ ! optional netcdf section
  !**********************************************************************
-      
+
+#if defined(ECMWF_NC)
       subroutine check(etat,code)
       integer, intent(in):: etat, code
       if(etat /= nf90_noerr) then
@@ -472,7 +479,7 @@ end subroutine alloc_ecmwf_diab
       end subroutine check
       
  !**********************************************************************     
-      
+
       subroutine read_diab_nc(indj,n)
       
       integer, intent(in):: indj,n
@@ -553,7 +560,7 @@ end subroutine alloc_ecmwf_diab
 
       return         
       end subroutine read_diab_nc    
-
+#endif
 
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
