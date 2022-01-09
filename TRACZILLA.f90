@@ -63,13 +63,16 @@
       logical :: error,oronew
 
       character(len=256):: pathfile
-      
+
+#if defined(PAR_RUN)      
       integer :: OMP_GET_NUM_PROCS, OMP_GET_NUM_THREADS
-      
+#endif      
+
       integer :: iargc
     
 ! Determines the number of threads for parallel run
 !**************************************************
+#if defined(PAR_RUN)
 !$OMP PARALLEL
 !$OMP MASTER
       num_threads=OMP_GET_NUM_THREADS()
@@ -82,6 +85,7 @@
         print *,'This code is asking more threads than available'
         stop
       endif
+#endif
 
 ! Read the pathnames where input/output files are stored
 !*******************************************************
@@ -337,10 +341,10 @@
          uupol(:,:,:,:) = MISSING
          vvpol(:,:,:,:) = MISSING
          tth(:,:,:,:)   = MISSING
-         ps(:,:,:)      = MISSING
-         tt2(:,:,:)     = MISSING
-         u10(:,:,:)     = MISSING
-         v10(:,:,:)     = MISSING
+         ps(:,:,:,:)      = MISSING
+         tt2(:,:,:,:)     = MISSING
+         u10(:,:,:,:)     = MISSING
+         v10(:,:,:,:)     = MISSING
          ! if needed according to the release plan
          ! be careful: will not work for nuvz_b>1 until diab code is adapted
          if(TTLactiv .or. CLAUSactiv) then
@@ -372,7 +376,7 @@
       allocate (xtra1(maxpart),ytra1(maxpart),ztra1(maxpart))
       allocate (itra1(maxpart))
       !allocate (itramem(maxpart))
-      print *,'alloc_parcels'	
+      print *,'alloc_parcels'
       
       end subroutine alloc_parcels
       
