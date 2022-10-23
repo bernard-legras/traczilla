@@ -1,1 +1,1 @@
-Makefile-pgi-ciclad
+Makefile-nv-spirit
