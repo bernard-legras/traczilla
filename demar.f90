@@ -87,7 +87,7 @@ contains
  character(len=72):: line
  logical error
  real epsil
- 
+
  namelist /COMMAND/     &
    ldirect,             & ! direction of integration
    ibdate, ibtime,      & ! beginnning date and time (YYYYMMDD, HHMISS)
@@ -152,7 +152,7 @@ contains
    
 !Open the command file and read user options
 !-------------------------------------------
-
+ 
  error=.false.
  print *,trim(path(1))//'COMMAND'
  open(unitcommand,file=trim(path(1))//'COMMAND',status='old',err=999)
@@ -266,7 +266,6 @@ contains
    case default
      parcel_dyn_alloc=.true.
  end select
-      
 
 ! Check input dates
 !------------------

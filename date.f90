@@ -154,7 +154,7 @@ contains
         JA=INT(0.01*JY)
         JULDAY=JULDAY+2-JA+INT(0.25*JA)
       ENDIF
-
+       
       JULDATE=DBLE(FLOAT(JULDAY))+DBLE(FLOAT(HH)/24.)+ &
          DBLE(FLOAT(MI)/1440.)+DBLE(FLOAT(SS)/86400.)
 
