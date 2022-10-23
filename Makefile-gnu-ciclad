@@ -4,7 +4,6 @@
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #=====|==1=========2=========3=========4=========5=========6=========7==
 #
-#TARGET=X64-ng
 TARGET=win
 HOME=/home/legras
 
@@ -13,7 +12,7 @@ FC = gfortran
 CC = gcc
 
 ifeq ($(TARGET),win)
-  MAIN = TRACZILLA-win
+  MAIN = TRACZILLA-gnu-ciclad
   #FFLAGS = -O2 -fopenmp -pedantic -std=f2008 -cpp -fconvert=swap -fall-intrinsics -ffpe-trap=invalid,zero,overflow,underflow -fmax-errors=20 -I/usr/include -I/opt/anaconda/envs/p39n/include 
   FFLAGS = -O3 -std=f2008 -cpp -Wall -fconvert=swap -fall-intrinsics -finit-real=nan -ffpe-trap=invalid,zero,overflow,underflow -fmax-errors=20 -I/opt/netcdf43/gfortran49/include -I/home/legras/eccodes/include 
   #FFLAGS = -g -std=f2008 -cpp -fconvert=swap -fall-intrinsics -ffpe-trap=invalid,zero,overflow,underflow -finit-real=nan -fmax-errors=20 -I/opt/netcdf43/gfortran49/include -I/home/legras/eccodes/include 
