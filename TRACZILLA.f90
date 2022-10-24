@@ -51,7 +51,9 @@
       use ecmwf_diab
       use mass_iso
       use ecmwf_inct
+#if defined(MERRA)
       use merra
+#endif
       use jra55
       use thermo
       use advect
@@ -129,7 +131,11 @@
       ! readpaths_diab and readavailable_diab are part of ecmwf_diab
       ! but serve the other cases (MERRA, JRA-55, ERA5)
       if(diabatic_w .and. & 
+#if defined(MERRA)
         (ecmwf_diabatic_w.or.merra_diab.or.jra55_diab.or.era5_diab) ) then
+#else
+        (ecmwf_diabatic_w.or.jra55_diab.or.era5_diab) ) then
+#endif
         call readpaths_diab(pathfile,error)
         call readavailable_diab(error)
         if (error) goto 999
@@ -149,14 +155,15 @@
         call gridcheck_iso(error)
       else if (era5_data) then
         call gridcheck_era5(error)
+#if defined(MERRA)
       else if (merra_data) then
         call gridcheck_merra(error)
+#endif
       else if (jra55_data) then
         call gridcheck_jra55(error)     
       else
 ! standard FLEXPART wind grib files
         call gridcheck(oronew,error)
-! ADD HERE A CALL TO gridcheck_merra
       endif
       if (error) goto 999
 
@@ -164,7 +171,9 @@
 !***********************************************************
       if (ecmwf_diabatic_w.and.mass_correction) call diab_mass_init
       if (ecmwf_inct_w.and.mass_correction) call diab_mass_inct_init
+#if defined(MERRA)
       if (merra_diab.and.mass_correction) call diab_mass_merra_init
+#endif
       if (jra55_diab.and.mass_correction) call diab_mass_jra55_init
       if (era5_diab.and.mass_correction) call diab_mass_era5_init
 
@@ -323,12 +332,14 @@
       subroutine alloc_3D
 
       ! always
-      if(merra_data) then
+      if (era5_data) then
+        call alloc_era5
+#if defined(MERRA)
+      else if(merra_data) then
         call alloc_merra
+#endif
       else if (jra55_data) then
         call alloc_jra55
-      else if (era5_data) then
-        call alloc_era5
       else
          print *,'alloc_3D uuh vvh tth uupol vvpol ps tt2 u10 v10'
          allocate (uupol(0:nx-1,0:ny-1,nuvz_b:nuvz,2),vvpol(0:nx-1,0:ny-1,nuvz_b:nuvz,2))

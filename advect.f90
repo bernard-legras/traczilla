@@ -35,7 +35,9 @@ use commons
 use ecmwf_diab
 use ecmwf_inct
 use mass_iso
+#if defined(MERRA)
 use merra
+#endif
 use jra55
 use era5
 use combin
@@ -171,7 +173,11 @@ contains
         qtra1=0.05_dp
       endif
 
+#if defined(MERRA)
       if (AGEBactiv.or.AGEFactiv.or.merra_diab.or.jra55_data) then
+#else
+      if (AGEBactiv.or.AGEFactiv.or.jra55_data) then
+#endif
         if (.not.allocated(ttra1)) then 
           allocate(ttra1(maxpart))
           print *,'allocated ttra1'
@@ -226,8 +232,10 @@ contains
           call getfields_iso(itime,nerr)
         else if (era5_data) then
           call getfields_era5(itime,nerr)
+#if defined(MERRA)
         else if (merra_data) then     
           call getfields_merra(itime,nerr)
+#endif
         else if (jra55_data) then
           call getfields_jra55(itime,nerr)
         else
@@ -306,22 +314,26 @@ contains
             if (tropopen) close(tropunit)
             write(yyyy,'(I4)') ytr
             if (diabatic_w) then
-               if (merra_data) then
+               if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-theta-ERA5-'//yyyy//'.bin'
+#if defined(MERRA)
+               else if (merra_data) then
                   tropofile=trim(tropodir)//'tropo-theta-MERRA-'//yyyy//'.bin'
+#endif
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-theta-JRA-'//yyyy//'.bin'
-               else if (era5_data) then
-                  tropofile=trim(tropodir)//'tropo-theta-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'          
                endif
             else if (z_motion) then
-               if (merra_data) then
+               if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-Z-ERA5-'//yyyy//'.bin'
+#if defined(MERRA)
+               else if (merra_data) then
                   tropofile=trim(tropodir)//'tropo-Z-MERRA-'//yyyy//'.bin'
+#endif
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-Z-JRA-'//yyyy//'.bin'
-               else if (era5_data) then
-                  tropofile=trim(tropodir)//'tropo-Z-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-Z-EI-'//yyyy//'.bin'          
                endif           
@@ -465,7 +477,11 @@ contains
 
 ! Integrate advection equation for lsynctime seconds
 !===================================================
+#if defined(MERRA)
           if (merra_diab.or.jra55_data.or.era5_data) tint=ttra1(j)
+#else
+          if (jra55_data.or.era5_data) tint=ttra1(j)
+#endif
             !if(debug_out) &
             !  print "(' timemanager> particle ',i6,2X,3G12.5)",&
             !     j,xtra1(j),ytra1(j),ztra1(j)
@@ -756,12 +772,14 @@ contains
             u,v,w, ngrid, theta_inf, theta_sup, z_factor,tint,nstop,jp)  
 !            if(debug_out) print *,'advanceB (u,v,w)> ',u,v,w*86400  ! test
         endif
+#if defined(MERRA)
       elseif (merra_data) then
         call interpol_wind_merra(itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
         !if(debug_out) print *,'abvanceB (x,y,z)> ',x,y,z
         !if(debug_out) print *,'lat lon        > ',y*dy+ylat0,x*dx+xlon0
         !if(debug_out) print *,'(u,v,w,tint)    > ',u,v,w*86400,tint
+#endif
       elseif (jra55_data) then
         call interpol_wind_jra55(itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
@@ -799,7 +817,11 @@ contains
       !  print*,p0*exp(-z),w*dt,z,psaver
       !endif
 !     diabatic trajectories with w in K/s
+#if defined(MERRA)
       if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data.or.jra55_data.or.era5_data)) &
+#else
+      if(diabatic_w .and. (ecmwf_diabatic_w.or.jra55_data.or.era5_data)) &
+#endif
          z=z+w*dt*float(ldirect)
       if(iso_mass .and. mass_diabat)  z=z+w*dt*float(ldirect)
 
@@ -833,7 +855,11 @@ contains
          if (z.lt.log(p0/psaver)) z=2*log(p0/psaver)-z ! bouncing
       endif
       if (theta_bounds) then
+#if defined(MERRA)              
          if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab.or.jra55_diab.or.era5_diab)) &
+#else
+         if (diabatic_w.and.(ecmwf_diabatic_w.or.jra55_diab.or.era5_diab)) &
+#endif
             z=max(min(z,theta_sup),theta_inf)
          if (mass_diabat) &
             z=max(min(z,ThetaLev(NbTheta)),ThetaLev(1))
@@ -885,18 +911,7 @@ contains
 
 !     nstop must be less or equal to 7 or change bound in timemanager
       
-      if(merra_data) then
-          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
-              (y.gt.nearest(float(ny)-0.5,1.)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
-             nstop=3
-             print *, 'stop parcel:trajectory terminated ',jp, ngrid
-             if (ngrid.ge.0) then
-                write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
-             else
-                write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
-             endif
-          endif
-      else if (jra55_data)  then
+      if (jra55_data)  then
           ! (90-ylat0)/dy=0.7675033...     1-0.7675033...=0.23249669...
           ! no reason to extend that to era5
           if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.-0.767504).or. &
@@ -909,6 +924,19 @@ contains
                 write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
              endif
           endif
+#if defined(MERRA)
+      else if(merra_data) then
+          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
+              (y.gt.nearest(float(ny)-0.5,1.)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
+             nstop=3
+             print *, 'stop parcel:trajectory terminated ',jp, ngrid
+             if (ngrid.ge.0) then
+                write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
+             else
+                write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
+             endif
+          endif
+#endif
       else if (setxylim) then
           if (y.lt.ylmin) then
             nstop=3

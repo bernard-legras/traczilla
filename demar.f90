@@ -79,7 +79,9 @@ contains
  use ecmwf_diab
  use ecmwf_inct
  use mass_iso
+#if defined(MERRA)
  use merra
+#endif
  use jra55
  use era5
  use readinterpN, only : ecmwf_data 
@@ -141,8 +143,10 @@ contains
    mass_isent,          & ! isentropic motion from data on isentropic levels
    mass_correction,     & ! heating rate correction to preserve mass conservation in the stratosphere
    mean_diab_output,    & ! Output of the mass averaged heating rate
+#if defined(MERRA)
    merra_data,          & ! merra winds
    merra_diab,          & ! merra heating rates
+#endif
    jra55_data,          & ! jra55 winds
    jra55_diab,          & ! jra55 heating rates
    era5_data,           & ! era5 winds
@@ -221,8 +225,10 @@ contains
  mass_isent=.false.
  mass_correction=.false.
  mean_diab_output=.false.
+#if defined(MERRA)
  merra_data=.false.
  merra_diab=.false.
+#endif
  jra55_data=.false.
  jra55_diab=.false.
  era5_data=.false.
@@ -254,8 +260,10 @@ contains
    data_source='EI'
  else if (jra55_data) then
    data_source='JRA55'
+#if defined(MERRA)
  else if (merra_data) then
    data_source='MERRA'
+#endif
  else if (era5_data) then
    data_source='ERA5'
  endif
@@ -331,7 +339,9 @@ contains
  print *,'readcommand > z_motion ',z_motion
  print *,'readcommand > isentropic_motion ',isentropic_motion
  print *,'readcommand > diabatic_w ',diabatic_w
+#if defined(MERRA)
  if (merra_data) print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
+#endif
  if (jra55_data) print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
  if (era5_data) print *,'readcommand > era5_data n _diab ',era5_data,era5_diab 
  print *,'readcommand > ecmwf_data _diabatic_w ',ecmwf_data,ecmwf_diabatic_w 
@@ -1576,7 +1586,9 @@ subroutine set_temp_for_theta(error)
   use isentrop_h
   use readinterpN, only : ecmwf_data
   use jra55, only : jra55_data
-  use merra, only : merra_data,merra_diab 
+#if defined(MERRA)
+  use merra, only : merra_data,merra_diab
+#endif
   use era5, only : era5_data
   
   logical, intent(out):: error
@@ -1632,10 +1644,12 @@ subroutine set_temp_for_theta(error)
          call calc_col_theta(ix+1,jy,1)
          call calc_col_theta(ix,jy+1,1)
          call calc_col_theta(ix+1,jy+1,1)
+#if defined(MERRA)
       else if (merra_diab) then
          print *,'ERROR set_temp_for_theta'
          error=.true.
-         return  
+         return
+#endif
       endif   
       ! Calculate pressure column 
       ! Works for ERA5, JRA55 and ERA-Int
@@ -1705,7 +1719,9 @@ subroutine set_temp_for_press(error)
   use isentrop_h
   use readinterpN, only : ecmwf_data
   use jra55, only : jra55_data
-  use merra, only : merra_data 
+#if defined(MERRA)
+  use merra, only : merra_data
+#endif 
   use era5, only:era5_data
   
   logical, intent(out) :: error
