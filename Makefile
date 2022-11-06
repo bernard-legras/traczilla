@@ -1,1 +1,1 @@
-Makefile-gnu-spirit
+Makefile-nv-spirit
