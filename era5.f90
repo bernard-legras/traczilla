@@ -1525,27 +1525,26 @@ subroutine interpol_wind_era5 &
 !***************************************************
 ! 4.) Calculation of z_factor for vertical diffusion
 !***************************************************
-!      deactivated sequence
+! Described : book C, part 2, p. 46
 
-!      select case (diftype)
-!      case (1)          ! diffusion in z (cf p.46, book C, part2)
+      select case (diftype)
+      case (1)          ! diffusion in z
+        if (z_motion) then ! using log p vertical coordinate 
+          z_factor = ga/(r_air*tint)
+        else ! using theta vertical coordinate (to be fixed)
 !       d theta / dz = - (g/theta) d theta / d Pi = -g d Log(theta) / d Pi
-!       where Pi = Cp (p/p0)**kappa = Cp T/theta
-!       estimated from the data on the lower left corner at first time
-!       of the interval, for a better estimate using the closest point
-!       activate the first following line and deactivate the second one 
-!       call sort_hor_distance       
-!        i0=ix; j0=jy; idxy=1
-!        pisup0 = cpa * tth(i0,j0,indz(idxy,1)+1)/trp(idxy,1)
-!        piinf0 = cpa * tth(i0,j0,indz(idxy,1))/tr(idxy,1)
-!        z_factor = -ga*(trp(idxy,1)-tr(idxy,1))/(pisup0-piinf0)
-!        TO BE REACTIVATED
-!        z_factor=0._dp
-!      case (2)          ! diffusion in theta
-!        z_factor = 1._dp
-!      case default
-!        z_factor = 0._dp
-!      end select
+!       where Pi = Cp (p/p0)**kappa = Cp T/theta        
+          z_factor = 0._dp
+        endif 
+      case (2)          ! diffusion in theta
+        if (z_motion) then ! using log p coordinate (to be fixed)
+          z_factor = 0._dp
+        else ! using theta coordinate
+          z_factor = 1._dp
+        endif
+      case default
+        z_factor = 0._dp
+      end select
      
       return
 
