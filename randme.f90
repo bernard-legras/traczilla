@@ -7,9 +7,9 @@ contains
 !=====|==1=========2=========3=========4=========5=========6=========7==
 !
 !  Taken from Press et al., Numerical Recipes
-!  Adaptation of the Miimum Standard generator which is portable on both
+!  Adaptation of the Minimum Standard generator which is portable on both
 !  32 bits and 64 bits architecture and is free of low-order serial correlations
-!  Must be called with idum a negative integer to initialize on the forst call
+!  Must be called with idum a negative integer to initialize on the first call
 
       FUNCTION RAN1(IDUM)
       INTEGER IDUM,IA,IM,IQ,IR,NTAB,NDIV
