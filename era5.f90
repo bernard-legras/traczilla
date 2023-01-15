@@ -157,7 +157,7 @@ end subroutine alloc_era5
    integer :: ifn,ll
    real(dbl) :: xaux1,xaux2,xaux3
    real(dp) :: yfirst,ylast,xlast,ylat1
-   real(dp) :: sizesouth,sizenorth
+   real(dbl) :: sizesouth,sizenorth
    
    integer :: vvv
    integer :: DateSize, TimeSize, ParamSize, LevelSize
@@ -329,10 +329,11 @@ end subroutine alloc_era5
     sglobal=.true.
     ! Enhance the map scale by factor 3 (*2=6) compared to north-south
     ! map scale
-    sizesouth=6._dp*(switchsouth+90._dp)/dy
-    call stlmbr(southpolemap,-90._dp,0._dp)
-    call stcm2p(southpolemap,0._dp,0._dp,switchsouth,0._dp,sizesouth, &
-    sizesouth,switchsouth,180._dp)
+    ! all polar transforms done in real*8
+    sizesouth=6.d0*(switchsouth+90.d0)/dy
+    call stlmbr(southpolemap,-90.d0, 0.d0)
+    call stcm2p(southpolemap,0.d0,0.d0,switchsouth,0.d0,sizesouth, &
+    sizesouth,switchsouth,180.d0)
     switchsouthg=(switchsouth-ylat0)/dy
     print *,'South pole in the grid'
   else
@@ -345,10 +346,13 @@ end subroutine alloc_era5
     nglobal=.true.
     ! Enhance the map scale by factor 3 (*2=6) compared to north-south
     ! map scale
-    sizenorth=6._dp*(90._dp-switchnorth)/dy
-    call stlmbr(northpolemap,90._dp,0._dp)
-    call stcm2p(northpolemap,0._dp,0._dp,switchnorth,0._dp,sizenorth, &
-    sizenorth,switchnorth,180._dp)
+    ! all polar transforms done in real*8
+    sizenorth=6.d0*(90.d0-switchnorth)/dy
+    call stlmbr(northpolemap,90.d0, 0.d0)
+    print *,'stlmbr',northpolemap
+    call stcm2p(northpolemap,0.d0,0.d0,switchnorth,0.d0,sizenorth, &
+    sizenorth,switchnorth,180.d0)
+    print *,'stcm2p',northpolemap
     switchnorthg=(switchnorth-ylat0)/dy
     print *,'North pole in the grid'
   else
@@ -974,7 +978,10 @@ data bb  / &
   use coord
   integer, intent(in):: n
   integer :: ix, jy, iz
-  real(dp) :: xlon, ylat
+  real(dbl) :: xlon, ylat
+  ! test
+  real(dbl) :: xlonr,ffpol,ddpol
+  real(dp) :: uuaux, vvaux, uupolaux, vvpolaux
 
 ! north pole region
   if (nglobal) then
@@ -997,6 +1004,17 @@ data bb  / &
 !$OMP END DO
 !$OMP END PARALLEL
 #endif
+
+! As a temporary fix, the velocity at the pole in polar coordinates is
+! replaced by the average over the closest latitude circle.
+! Even id only the horizontal component is at trouble, we include the 
+! vertical component as well.
+    do iz=1,nuvz
+      uupol(0:nx-1,ny-1,iz,n) = sum(uupol(0:nx-1,ny-2,iz,n))/nx
+      vvpol(0:nx-1,ny-1,iz,n) = sum(vvpol(0:nx-1,ny-2,iz,n))/nx
+      wwh(0:nx-1,ny-1,iz,n) = sum(wwh(0:nx-1,ny-2,iz,n))/nx
+    enddo
+   
   endif
 
 !    south pole region
@@ -1020,6 +1038,16 @@ data bb  / &
 !$OMP ENDDO
 !$OMP END PARALLEL
 #endif
+
+   ! As a temporary fix, the velocity at the pole in polar coordinates is
+   ! replaced by the average over the closest latitude circle.
+   ! Even id only the horizontal component is at trouble, we include the 
+   ! vertical component as well.
+    do iz=1,nuvz
+      uupol(0:nx-1,0,iz,n) = sum(uupol(0:nx-1,1,iz,n))/nx
+      vvpol(0:nx-1,0,iz,n) = sum(vvpol(0:nx-1,1,iz,n))/nx
+      wwh(0:nx-1,0,iz,n) = sum(wwh(0:nx-1,1,iz,n))/nx
+    enddo
   endif
   
   return
@@ -1231,7 +1259,7 @@ data bb  / &
 !#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#
 
 subroutine interpol_wind_era5 &
-         (itime,xt,yt,zt, dxdt,dydt,dzdt, ngrid, & 
+         (jp,itime,xt,yt,zt, dxdt,dydt,dzdt, ngrid, & 
           theta_inf,theta_sup,psaver,z_factor,tint,nstop)
 
 !*******************************************************************************
@@ -1265,7 +1293,7 @@ subroutine interpol_wind_era5 &
 !                                                                              *
 !*******************************************************************************
 
-      integer, intent(in) :: itime,ngrid
+      integer, intent(in) :: itime,ngrid,jp
       integer, intent(inout):: nstop
       real(dp), intent(in) :: xt,yt,zt
       real(dp), intent(inout) :: tint
@@ -1419,7 +1447,7 @@ subroutine interpol_wind_era5 &
         do m=1,2
           indexh=memind(m)
           indexh_diab=memind_diab(m)
-            
+          
           u(1,m)=uupol(ix ,jy ,indz  ,indexh)*fbot  &
                 + uupol(ix ,jy ,indz+1,indexh)*fup  
           v(1,m)=vvpol(ix ,jy ,indz  ,indexh)*fbot  &
