@@ -115,7 +115,7 @@ end subroutine alloc_merra
 
   use coord
   integer :: ifn, ncid
-  real(dp) :: sizesouth,sizenorth
+  real(dbl) :: sizesouth,sizenorth
   integer :: LonId, LatId, VerId, TIMEId
   integer :: LonVId,LatVId,VerVId
  
@@ -220,19 +220,19 @@ end subroutine alloc_merra
   sglobal=.true.               ! field contains south pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizesouth=6._dp*(switchsouth+90._dp)/dy
-  call stlmbr(southpolemap,-90._dp,0._dp)
-  call stcm2p(southpolemap,0._dp,0.,switchsouth,0._dp,sizesouth, &
-  sizesouth,switchsouth,180._dp)
+  sizesouth=6.D0*(switchsouth+90.D0)/dy
+  call stlmbr(southpolemap,-90.D0,0.D0)
+  call stcm2p(southpolemap,0.D0,0.D0,switchsouth,0.D0,sizesouth, &
+  sizesouth,switchsouth,180.D0)
   switchsouthg=(switchsouth-ylat0)/dy
 ! Imposes north pole
   nglobal=.true.               ! field contains north pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizenorth=6._dp*(90._dp-switchnorth)/dy
-  call stlmbr(northpolemap,90._dp,0._dp)
-  call stcm2p(northpolemap,0._dp,0._dp,switchnorth,0._dp,sizenorth, &
-  sizenorth,switchnorth,180._dp)
+  sizenorth=6.D0*(90.D0-switchnorth)/dy
+  call stlmbr(northpolemap,90.D0,0.D0)
+  call stcm2p(northpolemap,0.D0,0.D0,switchnorth,0.D0,sizenorth, &
+  sizenorth,switchnorth,180.D0)
   switchnorthg=(switchnorth-ylat0)/dy
   write(*,*)
   write(*,'(a,2i5,3L3)')' gribcheck_merra> nx,ny,xglobal,nglobal,sglobal ', &
@@ -643,7 +643,7 @@ end subroutine alloc_merra
   use coord
   integer, intent(in):: n
   integer :: ix, jy, iz, i, j
-  real(dp) :: xlon, ylat
+  real(dbl) :: xlon, ylat
 
 ! north pole region
   if (nglobal) then
