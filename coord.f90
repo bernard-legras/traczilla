@@ -10,10 +10,15 @@
 ! Modified by B. Legras to eliminate weird WMO behaviour
 ! within the last degree near the poles
 ! Unused routines eliminated
-	
-module coord
-!implicit none
+! 3-1-2023: Passed integrally in real*8 except the CC2GLL wind arguments which are used
+! to generate uupol and vvpol from uuh and vvh 
 
+module coord
+implicit none
+integer, parameter:: dbl=kind(0.d0),dp=kind(0.0),sp=kind(0.0)
+REAL(dbl), PARAMETER :: PI=3.14159265358979D0,RADPDG=PI/180,DGPRAD=180/PI
+REAL(dbl), PARAMETER :: REARTH=6367.47D0
+REAL(dbl), PARAMETER :: ALMST1=.9999999D0
 contains
 
 !*  GENERAL CONFORMAL MAP ROUTINES FOR METEOROLOGICAL MODELERS
@@ -167,16 +172,31 @@ contains
 
        SUBROUTINE CC2GLL (STRCMP, XLAT,XLONG, UE,VN, UG,VG)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       IMPLICIT NONE 
-       REAL, PARAMETER :: PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180/PI
-       DOUBLE PRECISION XPOLG,YPOLG,ALONG,SLONG,CLONG,ROT
-       
-       !REAL CSPANF
-       REAL, INTENT(OUT) :: UG,VG
-       REAL, INTENT(IN) :: STRCMP(9), XLAT, XLONG, UE, VN
+       REAL(dbl) XPOLG,YPOLG,ALONG,SLONG,CLONG,ROT
+       ! As this is used to convert {uuh, vvh} into {vvpol, uupol}
+       ! single precision is assumed
+       ! To be changed when all the code is passed into double precision
+       REAL(dp), INTENT(OUT) :: UG,VG
+       REAL(dbl), INTENT(IN) :: STRCMP(9), XLAT, XLONG 
+       REAL(dp), INTENT(IN) :: UE, VN
 
-       ALONG = CSPANF( XLONG - STRCMP(2), -180., 180.)
+       ALONG = CSPANF( XLONG - STRCMP(2), -180.D0, 180.D0)
+       !* The following paragraph assumes the pole line cotains two fixed values
+       !* which are the pole wind given according to WMO rule
+       ! if (xlat.gt.89.985D0) then
+       !*  North polar meteorological orientation: "north" along prime meridian
+       !  rot = - strcmp(1) * along + xlong - 180.D0
+       !elseif (xlat.lt.-89.985D0) then
+       !*  South polar meteorological orientation: "north" along prime meridian
+       !  rot = - strcmp(1) * along - xlong
+       !else
+       !  rot = - strcmp(1) * along
+       !endif
+       !* When the pole line is a double sinusoid in quadrature in continuity with
+       !* neighbour latitudes, we use the ansatz (It is not totally clear this
+       !* is correct but at least it avoids parcels to stick at the pole)
        ROT = - STRCMP(1) * ALONG
+
        SLONG = SIN( RADPDG * ROT )
        CLONG = COS( RADPDG * ROT )
        XPOLG = SLONG * STRCMP(5) + CLONG * STRCMP(6)
@@ -186,42 +206,41 @@ contains
        RETURN        
        END SUBROUTINE CC2GLL
 
-       REAL FUNCTION CGSZLL (STRCMP, XLAT,XLONG)
+       REAL(dbl) FUNCTION CGSZLL (STRCMP, XLAT,XLONG)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       PARAMETER (PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180D0/PI)
-       REAL STRCMP(9)
-       DOUBLE PRECISION SLAT,YMERC,EFACT
-       IF (XLAT .GT. 89.985) THEN
+       REAL(dbl), INTENT(IN) :: STRCMP(9), XLAT, XLONG
+       REAL(dbl) SLAT,YMERC,EFACT
+       IF (XLAT .GT. 89.985D0) THEN
 !* CLOSE TO NORTH POLE
-         IF (STRCMP(1) .GT. 0.9999) THEN
+         IF (STRCMP(1) .GT. 0.9999D0) THEN
 !* AND TO GAMMA == 1.
            CGSZLL = 2. * STRCMP(7)
            RETURN
          ENDIF
          EFACT = COS(RADPDG * XLAT)
-         IF (EFACT .LE. 0.) THEN
-           CGSZLL = 0.
+         IF (EFACT .LE. 0.D0) THEN
+           CGSZLL = 0.D0
            RETURN
          ELSE
-           YMERC = - LOG( EFACT /(1. + SIN(RADPDG * XLAT)))
+           YMERC = - LOG( EFACT /(1.D0 + SIN(RADPDG * XLAT)))
          ENDIF
-       ELSE IF (XLAT .LT. -89.985) THEN
+       ELSE IF (XLAT .LT. -89.985D0) THEN
 !* CLOSE TO SOUTH POLE
-         IF (STRCMP(1) .LT. -0.9999) THEN
+         IF (STRCMP(1) .LT. -0.9999D0) THEN
 !* AND TO GAMMA == -1.0
-           CGSZLL = 2. * STRCMP(7)
+           CGSZLL = 2 * STRCMP(7)
            RETURN
          ENDIF
          EFACT = COS(RADPDG * XLAT)
-         IF (EFACT .LE. 0.) THEN
-           CGSZLL = 0.
+         IF (EFACT .LE. 0.D0) THEN
+           CGSZLL = 0.D0
            RETURN
          ELSE
-           YMERC = LOG( EFACT /(1. - SIN(RADPDG * XLAT)))
+           YMERC = LOG( EFACT /(1.D0 - SIN(RADPDG * XLAT)))
          ENDIF
        ELSE
        SLAT = SIN(RADPDG * XLAT)
-       YMERC = LOG((1. + SLAT) / (1. - SLAT))/2.
+       YMERC = LOG((1.D0 + SLAT) / (1.D0 - SLAT))/2.
 !       EFACT = EXP(YMERC)
 !       CGSZLL = 2. * STRCMP(7) * EXP (STRCMP(1) * YMERC)
 !     C        / (EFACT + 1./EFACT)
@@ -231,9 +250,10 @@ contains
        END FUNCTION CGSZLL
                             
        SUBROUTINE CLL2XY (STRCMP, XLAT,XLONG, X,Y)
-!*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       PARAMETER (REARTH=6367.47)
-       REAL STRCMP(9)
+!*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL 
+       REAL(dbl), INTENT(IN) ::  STRCMP(9), XLAT, XLONG
+       REAL(dbl), INTENT(OUT) :: X, Y
+       REAL(dbl) :: XI, ETA
        CALL CNLLXY(STRCMP, XLAT,XLONG, XI,ETA)
        X = STRCMP(3) + REARTH/STRCMP(7) *                  &
              (XI * STRCMP(5) + ETA * STRCMP(6) )
@@ -245,69 +265,67 @@ contains
        SUBROUTINE CNLLXY (STRCMP, XLAT,XLONG, XI,ETA)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
 !  MAIN TRANSFORMATION ROUTINE FROM LATITUDE-LONGITUDE TO
-!  CANONICAL (EQUATOR-CENTERED, RADIAN UNIT) COORDINATES
-       PARAMETER (PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180/PI)
-       PARAMETER (ALMST1=.9999999)
-       REAL STRCMP(9)
-        DOUBLE PRECISION GAMMA
-       DOUBLE PRECISION DLONG,DLAT,SLAT,MERCY,GMERCY
-       GAMMA = STRCMP(1)
+!  CANONICAL (EQUATOR-CENTERED, RADIAN UNIT) COORDINATES  
+       REAL(dbl), INTENT(IN) :: STRCMP(9), XLAT, XLONG
+       REAL(dbl), INTENT(OUT) :: XI, ETA
+       REAL(dbl) :: GAMMAV, GDLONG, SNDGAM, CSDGAM, RHOG1
+       REAL(dbl) :: DLONG,DLAT,SLAT,MERCY,GMERCY
+       GAMMAV = STRCMP(1)
        DLAT = XLAT
-       DLONG = CSPANF(XLONG - STRCMP(2), -180., 180.)
+       DLONG = CSPANF(XLONG - STRCMP(2), -180.D0, 180.D0)
        DLONG = DLONG * RADPDG
-       GDLONG = GAMMA * DLONG
-       IF (ABS(GDLONG) .LT. .01) THEN
+       GDLONG = GAMMAV * DLONG
+       IF (ABS(GDLONG) .LT. .01D0) THEN
 !  CODE FOR GAMMA SMALL OR ZERO.  THIS AVOIDS ROUND-OFF ERROR OR DIVIDE-
 !  BY ZERO IN THE CASE OF MERCATOR OR NEAR-MERCATOR PROJECTIONS.
          GDLONG = GDLONG * GDLONG
-         SNDGAM = DLONG * (1. - 1./6. * GDLONG *        &
-                          (1. - 1./20. * GDLONG *       &
-                          (1. - 1./42. * GDLONG )))
+         SNDGAM = DLONG * (1.D0 - 1.D0/6.D0 * GDLONG *        &
+                          (1.D0 - 1.D0/20.D0 * GDLONG *       &
+                          (1.D0 - 1.D0/42.D0 * GDLONG )))
          CSDGAM = DLONG * DLONG * .5 *                  &
-                          (1. - 1./12. * GDLONG *       &
-                          (1. - 1./30. * GDLONG *       &
-                          (1. - 1./56. * GDLONG )))
+                          (1.D0 - 1.D0/12.D0 * GDLONG *       &
+                          (1.D0 - 1.D0/30.D0 * GDLONG *       &
+                          (1.D0 - 1.D0/56.D0 * GDLONG )))
        ELSE
 ! CODE FOR MODERATE VALUES OF GAMMA
-         SNDGAM = SIN (GDLONG) /GAMMA
-         CSDGAM = (1. - COS(GDLONG) )/GAMMA /GAMMA
+         SNDGAM = SIN (GDLONG) /GAMMAV
+         CSDGAM = (1. - COS(GDLONG) )/GAMMAV /GAMMAV
        ENDIF
        SLAT = SIN(RADPDG * DLAT)
        IF ((SLAT .GE. ALMST1) .OR. (SLAT .LE. -ALMST1)) THEN
-         ETA = 1./STRCMP(1)
-         XI = 0.
+         ETA = 1.D0/STRCMP(1)
+         XI = 0.D0
          RETURN
        ENDIF
-       MERCY = .5 * LOG( (1. + SLAT) / (1. - SLAT) )
-       GMERCY = GAMMA * MERCY
-       IF (ABS(GMERCY) .LT. .001) THEN
+       MERCY = .5D0 * LOG( (1.D0 + SLAT) / (1.D0 - SLAT) )
+       GMERCY = GAMMAV * MERCY
+       IF (ABS(GMERCY) .LT. .001D0) THEN
 !  CODE FOR GAMMA SMALL OR ZERO.  THIS AVOIDS ROUND-OFF ERROR OR DIVIDE-
 !  BY ZERO IN THE CASE OF MERCATOR OR NEAR-MERCATOR PROJECTIONS.
-         RHOG1 = MERCY * (1. - .5 * GMERCY *          &
-                         (1. - 1./3. * GMERCY *       &
-                         (1. - 1./4. * GMERCY ) ) )
+         RHOG1 = MERCY * (1.D0 - .5D0 * GMERCY *          &
+                         (1.D0 - 1.D0/3.D0 * GMERCY *       &
+                         (1.D0 - 1.D0/4.D0 * GMERCY ) ) )
        ELSE
 ! CODE FOR MODERATE VALUES OF GAMMA
-         RHOG1 = (1. - EXP(-GMERCY)) / GAMMA
+         RHOG1 = (1.D0 - EXP(-GMERCY)) / GAMMAV
        ENDIF
-       ETA = RHOG1 + (1. - GAMMA * RHOG1) * GAMMA * CSDGAM
-       XI = (1. - GAMMA * RHOG1 ) * SNDGAM
+       ETA = RHOG1 + (1.D0 - GAMMAV * RHOG1) * GAMMAV * CSDGAM
+       XI = (1. - GAMMAV * RHOG1 ) * SNDGAM
        END SUBROUTINE CNLLXY
 
        SUBROUTINE CNXYLL (STRCMP, XI,ETA, XLAT,XLONG)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
 !  MAIN TRANSFORMATION ROUTINE FROM CANONICAL (EQUATOR-CENTERED,
 !  RADIAN UNIT) COORDINATES
-       PARAMETER (PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180/PI)
-       PARAMETER (ALMST1=.9999999)
-       REAL STRCMP(9)
-       DOUBLE PRECISION GAMMA,TEMP,ARG1,ARG2,YMERC,ALONG,GXI,CGETA
-        DOUBLE PRECISION XI,ETA
-       GAMMA = STRCMP(1)
+       REAL(dbl), INTENT(IN) :: STRCMP(9)
+       REAL(dbl), INTENT(IN) ::  XI, ETA
+       REAL(dbl), INTENT(OUT):: XLAT, XLONG
+       REAL(dbl) :: GAMMAV,TEMP,ARG1,ARG2,YMERC,ALONG,GXI,CGETA,ODIST
+       GAMMAV = STRCMP(1)
 !  CALCULATE EQUIVALENT MERCATOR COORDINATE
        ODIST = XI*XI + ETA*ETA
-       ARG2 = 2. * ETA - GAMMA * (XI*XI + ETA*ETA)
-       ARG1 = GAMMA * ARG2
+       ARG2 = 2. * ETA - GAMMAV * (XI*XI + ETA*ETA)
+       ARG1 = GAMMAV * ARG2
 ! Change by A. Stohl to avoid problems close to the poles
 ! IF (ARG1 .GE. ALMST1) THEN
 !  DISTANCE TO NORTH (OR SOUTH) POLE IS ZERO (OR IMAGINARY ;) )
@@ -315,42 +333,42 @@ contains
 ! XLONG = STRCMP(2)
 ! RETURN
 ! ENDIF
-       IF (ABS(ARG1) .LT. .01) THEN
+       IF (ABS(ARG1) .LT. .01D0) THEN
 !  CODE FOR GAMMA SMALL OR ZERO.  THIS AVOIDS ROUND-OFF ERROR OR DIVIDE-
 !  BY ZERO IN THE CASE OF MERCATOR OR NEAR-MERCATOR PROJECTIONS.
-         TEMP = (ARG1 / (2. - ARG1) )**2
-         YMERC = ARG2 / (2. - ARG1) * (1.    + TEMP *   &
-                                      (1./3. + TEMP *   &
-                                      (1./5. + TEMP *   &
-                                      (1./7. ))))
+         TEMP = (ARG1 / (2.D0 - ARG1) )**2
+         YMERC = ARG2 / (2.D0 - ARG1) * (1.D0    + TEMP *   &
+                                      (1.D0/3.D0 + TEMP *   &
+                                      (1.D0/5.D0 + TEMP *   &
+                                      (1.D0/7.D0 ))))
        ELSE
 ! CODE FOR MODERATE VALUES OF GAMMA
-         YMERC = - LOG ( 1. - ARG1 ) /2. / GAMMA
+         YMERC = - LOG ( 1.D0 - ARG1 ) /2.D0 / GAMMAV
        ENDIF
 !  CONVERT YMERC TO LATITUDE
        TEMP = EXP( - ABS(YMERC) )
-       XLAT = SIGN(ATAN2((1. - TEMP) * (1. + TEMP), 2. * TEMP), YMERC)
+       XLAT = SIGN(ATAN2((1.D0 - TEMP) * (1.D0 + TEMP), 2.D0 * TEMP), YMERC)
 !  FIND LONGITUDES
-       GXI = GAMMA*XI
-       CGETA = 1. - GAMMA * ETA
-       IF ( ABS(GXI) .LT. .01*CGETA ) THEN
+       GXI = GAMMAV*XI
+       CGETA = 1.D0 - GAMMAV * ETA
+       IF ( ABS(GXI) .LT. .01D0*CGETA ) THEN
 !  CODE FOR GAMMA SMALL OR ZERO.  THIS AVOIDS ROUND-OFF ERROR OR DIVIDE-
 !  BY ZERO IN THE CASE OF MERCATOR OR NEAR-MERCATOR PROJECTIONS.
          TEMP = ( GXI /CGETA )**2
-         ALONG = XI / CGETA * (1.    - TEMP *     &
-                              (1./3. - TEMP *     &
-                              (1./5. - TEMP *     &
-                              (1./7.   ))))
+         ALONG = XI / CGETA * (1.D0    - TEMP *     &
+                              (1.D0/3.D0 - TEMP *     &
+                              (1.D0/5.D0 - TEMP *     &
+                              (1.D0/7.D0   ))))
        ELSE
 ! CODE FOR MODERATE VALUES OF GAMMA
-         ALONG = ATAN2( GXI, CGETA) / GAMMA
+         ALONG = ATAN2( GXI, CGETA) / GAMMAV
        ENDIF
        XLONG = SNGL(STRCMP(2) + DGPRAD * ALONG)
        XLAT = XLAT * DGPRAD
        RETURN
        END SUBROUTINE CNXYLL
 
-       REAL FUNCTION CSPANF (VALUE, BEGIN, ENDVAL)
+       REAL(dbl) FUNCTION CSPANF (VALU, BEGIN, ENDVAL)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
 !* REAL FUNCTION CSPANF RETURNS A VALUE IN THE INTERVAL (BEGIN,END]
 !* WHICH IS EQUIVALENT TO VALUE, MOD (END - BEGIN).  IT IS USED TO
@@ -366,11 +384,12 @@ contains
 !* EXAMPLES:
 !*      ALONG = CSPANF(XLONG, -180., +180.)
 !*      DIR  = CSPANF(ANGLE, 0., 360.)
-       REAL FIRST,LAST
+       REAL(dbl) :: FIRST,LAST,VAL
+       REAL(dbl), INTENT(IN) :: VALU, BEGIN, ENDVAL
        FIRST = MIN(BEGIN,ENDVAL)
        LAST = MAX(BEGIN,ENDVAL)
-       VAL = MOD( VALUE - FIRST , LAST - FIRST)
-       IF ( VAL .LE. 0.) THEN
+       VAL = MOD( VALU - FIRST , LAST - FIRST)
+       IF ( VAL .LE. 0.D0) THEN
          CSPANF = VAL + LAST
        ELSE
          CSPANF = VAL + FIRST
@@ -380,31 +399,35 @@ contains
 
        SUBROUTINE CXY2LL (STRCMP, X,Y, XLAT,XLONG)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       PARAMETER (REARTH=6367.47)
-        DOUBLE PRECISION XI0,ETA0,XI,ETA
-       REAL STRCMP(9)
+       IMPLICIT NONE
+       REAL(dbl), PARAMETER :: REARTH=6367.47D0
+       REAL(dbl) XI0,ETA0,XI,ETA
+       REAL(dbl), INTENT(IN) :: STRCMP(9), X, Y
+       REAL(dbl), INTENT(OUT) :: XLAT, XLONG 
        XI0 = ( X - STRCMP(3) ) * STRCMP(7) / REARTH
        ETA0 = ( Y - STRCMP(4) ) * STRCMP(7) /REARTH
        XI = XI0 * STRCMP(5) - ETA0 * STRCMP(6)
        ETA = ETA0 * STRCMP(5) + XI0 * STRCMP(6)
        CALL CNXYLL(STRCMP, XI,ETA, XLAT,XLONG)
-       XLONG = CSPANF(XLONG, -180., 180.)
+       XLONG = CSPANF(XLONG, -180.D0, 180.D0)
        RETURN
        END SUBROUTINE CXY2LL
 
        SUBROUTINE STCM1P(STRCMP, X1,Y1, XLAT1,XLONG1,  &
-                          XLATG,XLONGG, GRIDSZ, ORIENT)
+                         XLATG,XLONGG, GRIDSZ, ORIENT)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       PARAMETER (PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180/PI)
-       REAL STRCMP(9)
+       REAL(dbl), INTENT(INOUT) :: STRCMP(9)
+       REAL(dbl), INTENT(IN) :: ORIENT, GRIDSZ, XLATG, XLONGG, X1, Y1, XLAT1, XLONG1
+       REAL(dbl) :: TURN, X1A, Y1A 
+       INTEGER :: K
        DO K=3,4
-         STRCMP (K) = 0.
+         STRCMP (K) = 0.D0
        ENDDO
-        TURN = RADPDG * (ORIENT - STRCMP(1) *      &
-                  CSPANF(XLONGG - STRCMP(2), -180., 180.) )
+       TURN = RADPDG * (ORIENT - STRCMP(1) *      &
+                  CSPANF(XLONGG - STRCMP(2), -180.D0, 180.D0) )
        STRCMP (5) = COS (TURN)
        STRCMP (6) = - SIN (TURN)
-       STRCMP (7) = 1.
+       STRCMP (7) = 1.D0
        STRCMP (7) = GRIDSZ * STRCMP(7)            &
                    / CGSZLL(STRCMP, XLATG, STRCMP(2))
        CALL CLL2XY (STRCMP, XLAT1,XLONG1, X1A,Y1A)
@@ -416,12 +439,15 @@ contains
        SUBROUTINE STCM2P(STRCMP, X1,Y1, XLAT1,XLONG1, &
                                   X2,Y2, XLAT2,XLONG2)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       REAL STRCMP(9)
+       REAL(dbl), INTENT(INOUT) :: STRCMP(9)
+       REAL(dbl), INTENT(IN) :: X1, Y1, X2, Y2, XLAT1, XLONG1, XLAT2, XLONG2
+       REAL(dbl) :: X1A, Y1A, X2A, Y2A, DEN, DENA
+       INTEGER :: K
        DO K=3,6
-         STRCMP (K) = 0.
+         STRCMP (K) = 0.D0
        ENDDO
-       STRCMP (5) = 1.
-       STRCMP (7) = 1.
+       STRCMP (5) = 1.D0
+       STRCMP (7) = 1.D0
        CALL CLL2XY (STRCMP, XLAT1,XLONG1, X1A,Y1A)
        CALL CLL2XY (STRCMP, XLAT2,XLONG2, X2A,Y2A)
        DEN = SQRT( (X1 - X2)**2 + (Y1 - Y2)**2 )
@@ -439,28 +465,28 @@ contains
 
        SUBROUTINE STLMBR(STRCMP, TNGLAT, XLONG)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       PARAMETER (PI=3.14159265358979,RADPDG=PI/180,DGPRAD=180/PI)
-       PARAMETER (REARTH=6371.2)
-       REAL STRCMP(9)
+       REAL(dbl), INTENT(OUT) :: STRCMP(9)
+       REAL(dbl), INTENT(IN) :: TNGLAT, XLONG
+       REAL(dbl) :: XI, ETA
        STRCMP(1) = SIN(RADPDG * TNGLAT)
 !*  GAMMA = SINE OF THE TANGENT LATITUDE
-       STRCMP(2) = CSPANF( XLONG, -180., +180.)
+       STRCMP(2) = CSPANF( XLONG, -180.D0, +180.D0)
 !* LAMBDA_0 = REFERENCE LONGITUDE
-       STRCMP(3) = 0.
+       STRCMP(3) = 0.D0
 !* X_0 = X- GRID COORDINATE OF ORIGIN (XI,ETA) = (0.,0.)
-       STRCMP(4) = 0.
+       STRCMP(4) = 0.D0
 !* y_0 = Y-GRID COORDINATE OF ORIGIN (XI,ETA) = (0.,0.)
-       STRCMP(5) = 1.
+       STRCMP(5) = 1.D0
 !* COSINE OF ROTATION ANGLE FROM XI,ETA TO X,Y
-       STRCMP(6) = 0.
+       STRCMP(6) = 0.D0
 !* SINE OF ROTATION ANGLE FROM XI,ETA TO X,Y
        STRCMP(7) = REARTH
 !* GRIDSIZE IN KILOMETERS AT THE EQUATOR
-       CALL CNLLXY(STRCMP, 89.,XLONG, XI,ETA)
-       STRCMP(8) = 2. * ETA - STRCMP(1) * ETA * ETA
+       CALL CNLLXY(STRCMP, 89.D0,XLONG, XI,ETA)
+       STRCMP(8) = 2 * ETA - STRCMP(1) * ETA * ETA
 !* RADIAL COORDINATE FOR 1 DEGREE FROM NORTH POLE
-       CALL CNLLXY(STRCMP, -89.,XLONG, XI,ETA)
-          STRCMP(9) = 2. * ETA - STRCMP(1) * ETA * ETA
+       CALL CNLLXY(STRCMP, -89.D0,XLONG, XI,ETA)
+          STRCMP(9) = 2 * ETA - STRCMP(1) * ETA * ETA
 !* RADIAL COORDINATE FOR 1 DEGREE FROM SOUTH POLE
        RETURN
        END SUBROUTINE STLMBR
