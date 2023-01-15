@@ -57,6 +57,7 @@
       use advect
       use date
       use demar
+      use coord
       implicit none
 
       integer :: i
