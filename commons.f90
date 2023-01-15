@@ -85,7 +85,7 @@ module commons
 ! Parameters for polar stereographic projection close to the poles
 !*****************************************************************
 
-      real(dp), parameter :: switchnorth=75._dp,switchsouth=-75._dp
+      real(dbl), parameter :: switchnorth=75._dbl,switchsouth=-75._dbl
 
 ! switchnorth    use polar stereographic grid north of switchnorth
 ! switchsouth    use polar stereographic grid south of switchsouth
@@ -572,7 +572,7 @@ module commons
 !     switchnorthg,switchsouthg L  same as parameters switchnorth,
 !                                  switchsouth, but in grid units
 
-      real(dp) :: southpolemap(9),northpolemap(9)
+      real(dbl) :: southpolemap(9),northpolemap(9)
 
 !     southpolemap,northpolemap L  define stereographic projections
 !                         at the two poles
