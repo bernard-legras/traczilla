@@ -466,12 +466,13 @@ contains
 ! Integrate advection equation for lsynctime seconds
 !===================================================
           if (merra_diab.or.jra55_data.or.era5_data) tint=ttra1(j)
-            !if(debug_out) &
-            !  print "(' timemanager> particle ',i6,2X,3G12.5)",&
-            !     j,xtra1(j),ytra1(j),ztra1(j)
-          
+          !if((debug_out).and.(modulo(j,1)==0).and.(j>=602520).and.(j<602530)) &
+               !print "(' timemanager> particle ',i8,2X,3G12.5)",&
+               !  j,xtra1(j),ytra1(j),ztra1(j)
+ 
           call advanceB(j,itime,dt,nstop, &
-            xtra1(j),ytra1(j),ztra1(j),tint,sortie)     
+            xtra1(j),ytra1(j),ztra1(j),tint,sortie)
+ 
           npproc_thread=npproc_thread+1 
 
 ! Test ------------------------------
@@ -680,6 +681,7 @@ contains
 !                                                                              *
 !*******************************************************************************
 
+      use coord
       integer, parameter :: nss=10
       real, parameter :: pih=pi/180.,eps=1.e-4
       
@@ -697,8 +699,8 @@ contains
 
       integer :: ngrid, idummy, i
       real(dp) :: wdiff
-      real(dp) :: xlon,ylat,xpol,ypol,gridsize
-      real(dp) :: cosfact,psaver,theta_inf,theta_sup
+      real(dbl):: xlon,ylat,xpol,ypol, gg
+      real(dp) :: cosfact,psaver,theta_inf,theta_sup, gridsize
       real(dp) :: u,v,w,dxsave,dysave,z_factor,rand_angle
       real(dp), dimension(nss) :: harvest
       real(dp) :: press
@@ -741,7 +743,6 @@ contains
 ! Interpolate the wind
 !=====================
 
-      !if (debug_out) print *,'advanceB call interpol'
       if(isentropic_motion) then
         call interpol_wind_theta (itime,x,y, z, & 
            u,v, ngrid, theta_inf, theta_sup, z_factor,tint)
@@ -766,7 +767,7 @@ contains
         call interpol_wind_jra55(itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
       elseif (era5_data) then
-        call interpol_wind_era5(itime,x,y,z,u,v,w,ngrid, &
+        call interpol_wind_era5(jp,itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop) 
       ! beware that this is only z_motion for the kinematic case of the
       ! ECMWF data in the standard EN format and processing w in the 
@@ -814,6 +815,10 @@ contains
         wdiff=2*sum(harvest) - nss
         wdiff = wdiff*sqrt(6*diffus/(nss*dt))
         if(verdiff) z=z+wdiff*dt*float(ldirect)*z_factor
+        ! ACHTUNG:
+        ! The action of horizontal diffusion in the polar stereoscopic regions 
+        ! is is not consistent and this option should not be used when
+        ! parcels travel in these regions.
         if(hordiff) then
           rand_angle = ran1(seed(num_thread))
           !call random_number(rand_angle)
@@ -842,37 +847,39 @@ contains
 ! Calculates new horizontal position in grid coordinates
 !=======================================================
 ! Manage polar regions
+! Calculations are partially in double precision
 
       if (ngrid.ge.0) then
         cosfact=dxconst/cos((y*dy+ylat0)*pih)
         x=x+dxsave*cosfact
         y=y+dysave*dyconst
       else if (ngrid.eq.-1) then      ! around north pole
-        xlon=xlon0+x*dx
-        ylat=ylat0+y*dy
+        xlon=real(xlon0+x*dx,kind=dbl)
+        ylat=real(ylat0+y*dy,kind=dbl)
         call cll2xy(northpolemap,ylat,xlon,xpol,ypol)
-        gridsize=1000.*cgszll(northpolemap,ylat,xlon)
+        gg = cgszll(northpolemap,ylat,xlon)
+        gridsize=1000.*real(gg,kind=dp)
         dxsave=dxsave/gridsize
         dysave=dysave/gridsize
-        xpol=xpol+dxsave
-        ypol=ypol+dysave
+        xpol=xpol+real(dxsave,kind=dbl)
+        ypol=ypol+real(dysave,kind=dbl)
         call cxy2ll(northpolemap,xpol,ypol,ylat,xlon)
-        x=(xlon-xlon0)/dx
-        y=(ylat-ylat0)/dy
+        x=real((xlon-xlon0)/dx,kind=dp)
+        y=real((ylat-ylat0)/dy,kind=dp)
       else if (ngrid.eq.-2) then    ! around south pole
-        xlon=xlon0+x*dx
-        ylat=ylat0+y*dy
+        xlon=real(xlon0+x*dx,kind=dbl)
+        ylat=real(ylat0+y*dy,kind=dbl)
         call cll2xy(southpolemap,ylat,xlon,xpol,ypol)
-        gridsize=1000.*cgszll(southpolemap,ylat,xlon)
+        gg = cgszll(southpolemap,ylat,xlon)
+        gridsize=1000.*real(gg,kind=dp)
         dxsave=dxsave/gridsize
         dysave=dysave/gridsize
-        xpol=xpol+dxsave
-        ypol=ypol+dysave
+        xpol=xpol+real(dxsave,kind=dbl)
+        ypol=ypol+real(dysave,kind=dbl)
         call cxy2ll(southpolemap,xpol,ypol,ylat,xlon)
-        x=(xlon-xlon0)/dx
-        y=(ylat-ylat0)/dy
+        x=real((xlon-xlon0)/dx,kind=dp)
+        y=real((ylat-ylat0)/dy,kind=dp)
       endif
-
 
 ! If global data are available, use cyclic boundary condition
 !------------------------------------------------------------
