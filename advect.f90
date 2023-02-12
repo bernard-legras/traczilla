@@ -34,16 +34,18 @@ use commons
 !                          mass_triad_b  !test----
 use ecmwf_diab
 use ecmwf_inct
+#if defined(MASS_ISO)
 use mass_iso
+#endif
+#if defined(MERRA)
 use merra
+#endif
 use jra55
 use era5
-use combin
 use io
 use demar
 use thermo
 use readinterpN
-use randme
 implicit none
 public :: timemanagerB
 private :: advanceB
@@ -101,33 +103,35 @@ contains
 ! Constants:                                                                   *
 ! maxpart            maximum number of trajectories                            *
 !                                                                              *
-!*******************************************************************************
-
+!*******************************************************************************    
+      use combin
+      
+      real(dp), allocatable :: buff(:),tropozdd(:,:)      
+      real(dp) :: ddx, ddy
+      real(dp) :: tint, minz, maxz, meanz
+      real(dp) :: dt
+      real(dp) :: epsil=1.e-3
       integer :: i,j,itime,nstop, sortie, ix, jy
       integer :: loutnext,loutnext0
       integer :: npproc,npstop(7),npsortie(4),nb_bounce, nerr
       integer :: count_clock_1,count_clock_2,count_rate,count_max
-      integer :: next_time_orthog, prev_time_orthog
+      !integer :: next_time_orthog, prev_time_orthog
       integer, allocatable :: shuffle(:)
       integer :: npproc_thread,nb_bounce_thread,npstop_thread(7)
       integer :: num_thread, npsortie_thread(4)
       logical :: tropotest
-      integer :: yyyymmdd,hhmmss,ytr,mtr,dtr,dyr,year_length
+      integer :: yyyymmdd,hhmmss,ytr,mtr,dtr,dyr
       integer :: ldayscum(12)
-      character (4) :: yyyy
-      character (len=256) :: tropofile
-      real (dp), allocatable :: buff(:),tropozdd(:,:)
-      real (dp) :: ddx,ddy
-      real (dp) :: tint, minz, maxz, meanz
-      real (dp) :: dt
-      real (dp) :: epsil=1.e-3
+      
 !     real lambdaa(3,maxlyap), lambdab(3,maxlyap)
 !     real xm,xm1
       logical :: error,trace_time, tropopen
       logical, allocatable :: mask_part(:)
+#if defined(PAR_RUN)
       integer :: n,nb_processors,OMP_GET_THREAD_NUM
-!     external ctrper
-
+#endif  
+      character (4) :: yyyy
+      character (len=256) :: tropofile
       !test-----
       ! real cc
       !---------
@@ -170,8 +174,12 @@ contains
 ! mixing ratio initialized at the beginning, after each output or after restart
         qtra1=0.05_dp
       endif
-
+      
+#if defined(MERRA)
       if (AGEBactiv.or.AGEFactiv.or.merra_diab.or.jra55_data) then
+#else
+      if (AGEBactiv.or.AGEFactiv.or.jra55_data) then
+#endif      
         if (.not.allocated(ttra1)) then 
           allocate(ttra1(maxpart))
           print *,'allocated ttra1'
@@ -222,12 +230,17 @@ contains
 
 ! Get necessary wind fields if not available
 !===========================================
-        if(iso_mass) then
-          call getfields_iso(itime,nerr)
-        else if (era5_data) then
+
+       if (era5_data) then
           call getfields_era5(itime,nerr)
+#if defined(MASS_ISO)
+       else if(iso_mass) then
+          call getfields_iso(itime,nerr)
+#endif       
+#if defined(MERRA)
         else if (merra_data) then     
           call getfields_merra(itime,nerr)
+#endif
         else if (jra55_data) then
           call getfields_jra55(itime,nerr)
         else
@@ -306,22 +319,26 @@ contains
             if (tropopen) close(tropunit)
             write(yyyy,'(I4)') ytr
             if (diabatic_w) then
-               if (merra_data) then
+               if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-theta-ERA5-'//yyyy//'.bin'
+#if defined(MERRA)
+               else if (merra_data) then
                   tropofile=trim(tropodir)//'tropo-theta-MERRA-'//yyyy//'.bin'
+#endif
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-theta-JRA-'//yyyy//'.bin'
-               else if (era5_data) then
-                  tropofile=trim(tropodir)//'tropo-theta-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-theta-EI-'//yyyy//'.bin'          
                endif
             else if (z_motion) then
-               if (merra_data) then
+               if (era5_data) then
+                  tropofile=trim(tropodir)//'tropo-Z-ERA5-'//yyyy//'.bin'
+#if defined(MERRA)
+               else if (merra_data) then
                   tropofile=trim(tropodir)//'tropo-Z-MERRA-'//yyyy//'.bin'
+#endif
                else if (jra55_data) then
                   tropofile=trim(tropodir)//'tropo-Z-JRA-'//yyyy//'.bin'
-               else if (era5_data) then
-                  tropofile=trim(tropodir)//'tropo-Z-ERA5-'//yyyy//'.bin'
                else
                   tropofile=trim(tropodir)//'tropo-Z-EI-'//yyyy//'.bin'          
                endif           
@@ -465,7 +482,11 @@ contains
 
 ! Integrate advection equation for lsynctime seconds
 !===================================================
+#if defined(MERRA)
           if (merra_diab.or.jra55_data.or.era5_data) tint=ttra1(j)
+#else
+          if (jra55_data.or.era5_data) tint=ttra1(j)
+#endif
           !if((debug_out).and.(modulo(j,1)==0).and.(j>=602520).and.(j<602530)) &
                !print "(' timemanager> particle ',i8,2X,3G12.5)",&
                !  j,xtra1(j),ytra1(j),ztra1(j)
@@ -611,12 +632,15 @@ contains
                 p0*(ttra1(maxloc(ztra1(1:numpart),DIM=1,MASK=mask_part))/maxz)**(1/kappa)
             endif
           endif                 
-          
+
+#if defined(MASS_ISO)          
           if(iso_mass) then                 
              mask_part(:) = mask_part(:) .and. (ztra1(:) .ge. ThetaLev(NbTheta))
              !print*,'# hanged ',sum(transfer(mask_part,1,size=size(mask_part)))
              print *,'# hanged ',count(mask_part)
           endif
+#endif
+
           deallocate (mask_part)
           npstop(:)=0
         endif
@@ -682,6 +706,8 @@ contains
 !*******************************************************************************
 
       use coord
+      use polarproj
+      use randme
       integer, parameter :: nss=10
       real, parameter :: pih=pi/180.,eps=1.e-4
       
@@ -705,8 +731,12 @@ contains
       real(dp), dimension(nss) :: harvest
       real(dp) :: press
       save idummy
-      integer :: num_thread, OMP_GET_THREAD_NUM
-
+      integer :: num_thread
+#if defined(PAR_RUN)      
+      integer :: OMP_GET_THREAD_NUM
+#endif
+      !logical :: mydebug !! DEBUG
+      
       data idummy/-7/
 
       dxsave=0.           ! reset position displacements
@@ -723,11 +753,11 @@ contains
       num_thread=1
 #endif
       if (num_thread==0) num_thread=1
-      !if (modulo(jp,20000).eq.0) then
-      !  print *, num_thread
-      !endif   
-       
-! Determine whether lat/long grid or polarstereographic projection
+
+      !mydebug = .false.  !! DEBUG
+      !if ((itime<-864000).and.(jp==1188000)) mydebug = .true.  !! DEBUG
+!
+      ! Determine whether lat/long grid or polarstereographic projection
 ! is to be used
 ! Furthermore, determine which nesting level to be used
 !=================================================================
@@ -757,12 +787,14 @@ contains
             u,v,w, ngrid, theta_inf, theta_sup, z_factor,tint,nstop,jp)  
 !            if(debug_out) print *,'advanceB (u,v,w)> ',u,v,w*86400  ! test
         endif
+#if defined(MERRA)
       elseif (merra_data) then
         call interpol_wind_merra(itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
         !if(debug_out) print *,'abvanceB (x,y,z)> ',x,y,z
         !if(debug_out) print *,'lat lon        > ',y*dy+ylat0,x*dx+xlon0
         !if(debug_out) print *,'(u,v,w,tint)    > ',u,v,w*86400,tint
+#endif 
       elseif (jra55_data) then
         call interpol_wind_jra55(itime,x,y,z,u,v,w,ngrid, &
            theta_inf,theta_sup,psaver,z_factor,tint,nstop)
@@ -773,15 +805,22 @@ contains
       ! ECMWF data in the standard EN format and processing w in the 
       ! staggered grid
       ! kinematic case for jra55 and era5 is already treated above         
+      !if (mydebug) then !! DEBUG
+      !  print *,'advect itime jp> ',itime,jp
+      !  print *,'x y z',x,y,z
+      !  print *,'u,v,w',u,v,w
+      !endif  !! DEBUG
       elseif (z_motion) then
         call interpol_windB(itime,x,y,z,u,v,w,ngrid, &
            psaver,z_factor,tint)
         !if(debug_out) print *,'abvanceB (j,x,y,z)> ',jp,x,y,z
-        !if(debug_out) print *,'(u,v,w,tint)> ',u,v,w,tint        ! test
+        !if(debug_out) print *,'(u,v,w,tint)> ',u,v,w,tint         !test
+#if defined(MASS_ISO)
       elseif (iso_mass) then
         call interpol_wind_iso(itime, x, y, z, & 
            u, v, w, ngrid, z_factor, tint, nstop)
 !           if(debug_out) print *,'advanceB (u,v,w)> ',u,v,w*86400  ! test
+#endif
       endif
 
 ! Compute everything for above the PBL
@@ -800,9 +839,15 @@ contains
       !  print*,p0*exp(-z),w*dt,z,psaver
       !endif
 !     diabatic trajectories with w in K/s
+#if defined(MERRA)
       if(diabatic_w .and. (ecmwf_diabatic_w.or.merra_data.or.jra55_data.or.era5_data)) &
+#else
+      if(diabatic_w .and. (ecmwf_diabatic_w.or.jra55_data.or.era5_data)) &
+#endif
          z=z+w*dt*float(ldirect)
+#if defined(MASS_ISO)
       if(iso_mass .and. mass_diabat)  z=z+w*dt*float(ldirect)
+#endif
 
 ! Add random vertical/horizontal component to the displacement
 !=============================================================
@@ -838,10 +883,16 @@ contains
          if (z.lt.log(p0/psaver)) z=2*log(p0/psaver)-z ! bouncing
       endif
       if (theta_bounds) then
+#if defined(MERRA)              
          if (diabatic_w.and.(ecmwf_diabatic_w.or.merra_diab.or.jra55_diab.or.era5_diab)) &
+#else
+         if (diabatic_w.and.(ecmwf_diabatic_w.or.jra55_diab.or.era5_diab)) &
+#endif
             z=max(min(z,theta_sup),theta_inf)
+#if defined(MASS_ISO)
          if (mass_diabat) &
             z=max(min(z,ThetaLev(NbTheta)),ThetaLev(1))
+#endif
       endif
        
 ! Calculates new horizontal position in grid coordinates
@@ -853,32 +904,72 @@ contains
         cosfact=dxconst/cos((y*dy+ylat0)*pih)
         x=x+dxsave*cosfact
         y=y+dysave*dyconst
-      else if (ngrid.eq.-1) then      ! around north pole
-        xlon=real(xlon0+x*dx,kind=dbl)
-        ylat=real(ylat0+y*dy,kind=dbl)
-        call cll2xy(northpolemap,ylat,xlon,xpol,ypol)
-        gg = cgszll(northpolemap,ylat,xlon)
-        gridsize=1000.*real(gg,kind=dp)
-        dxsave=dxsave/gridsize
-        dysave=dysave/gridsize
-        xpol=xpol+real(dxsave,kind=dbl)
-        ypol=ypol+real(dysave,kind=dbl)
-        call cxy2ll(northpolemap,xpol,ypol,ylat,xlon)
-        x=real((xlon-xlon0)/dx,kind=dp)
-        y=real((ylat-ylat0)/dy,kind=dp)
-      else if (ngrid.eq.-2) then    ! around south pole
-        xlon=real(xlon0+x*dx,kind=dbl)
-        ylat=real(ylat0+y*dy,kind=dbl)
-        call cll2xy(southpolemap,ylat,xlon,xpol,ypol)
-        gg = cgszll(southpolemap,ylat,xlon)
-        gridsize=1000.*real(gg,kind=dp)
-        dxsave=dxsave/gridsize
-        dysave=dysave/gridsize
-        xpol=xpol+real(dxsave,kind=dbl)
-        ypol=ypol+real(dysave,kind=dbl)
-        call cxy2ll(southpolemap,xpol,ypol,ylat,xlon)
-        x=real((xlon-xlon0)/dx,kind=dp)
-        y=real((ylat-ylat0)/dy,kind=dp)
+      else if (oldpole) then
+        if (ngrid.eq.-1) then      ! around north pole
+          xlon=real(xlon0+x*dx,kind=dbl)
+          ylat=real(ylat0+y*dy,kind=dbl)
+          call cll2xy(northpolemap,ylat,xlon,xpol,ypol)
+          gg = cgszll(northpolemap,ylat)
+          gridsize=1000.*real(gg,kind=dp)
+          !if (mydebug) then  !! DEBUG
+          !  print *,'pre>  lon lat xpol ypol gg',real(xlon),real(ylat),real(xpol),real(ypol),real(gg)
+          !endif  !! DEBUG
+          dxsave=dxsave/gridsize
+          dysave=dysave/gridsize
+          xpol=xpol+real(dxsave,kind=dbl)
+          ypol=ypol+real(dysave,kind=dbl)
+          call cxy2ll(northpolemap,xpol,ypol,ylat,xlon)
+          x=real((xlon-xlon0)/dx,kind=dp)
+          y=real((ylat-ylat0)/dy,kind=dp)
+          !if (mydebug) then  !! DEBUG
+          !  print *,'post> lon lat xpol ypol',real(xlon),real(ylat),real(xpol),real(ypol)
+          !  print *,'x y z',x,y,z
+          !endif  !! DEBUG
+        else if (ngrid.eq.-2) then      ! around south pole
+          xlon=real(xlon0+x*dx,kind=dbl)
+          ylat=real(ylat0+y*dy,kind=dbl)
+          call cll2xy(southpolemap,ylat,xlon,xpol,ypol)
+          gg = cgszll(southpolemap,ylat)
+          gridsize=1000.*real(gg,kind=dp)
+          dxsave=dxsave/gridsize
+          dysave=dysave/gridsize
+          xpol=xpol+real(dxsave,kind=dbl)
+          ypol=ypol+real(dysave,kind=dbl)
+          call cxy2ll(southpolemap,xpol,ypol,ylat,xlon)
+          x=real((xlon-xlon0)/dx,kind=dp)
+          y=real((ylat-ylat0)/dy,kind=dp)
+        endif
+      else
+      if (ngrid.eq.-1) then      ! around north pole
+        xlon = real(xlon0+x*dx,kind=dbl)
+        ylat = real(ylat0+y*dy,kind=dbl)
+        call ll2polxyNP(xlon,ylat,xpol,ypol)
+        !if (mydebug) then  !! DEBUG
+        !  print *,'pre>  lon lat xpol ypol',real(xlon),real(ylat),real(xpol),real(ypol)
+        !endif !! DEBUG
+        xpol = xpol+real(dxsave,kind=dbl)
+        ypol = ypol+real(dysave,kind=dbl)
+        call polxy2llNP(xlon,ylat,xpol,ypol)
+        x = real((xlon-xlon0)/dx,kind=dp)
+        ! Achtung:  nx-1, not nx, means 360 degrees
+        if (x < 0) x = x + real(nx-1,kind=dp)
+        y = real((ylat-ylat0)/dy,kind=dp)
+        !if (mydebug) then  !!DEBUG
+        !  print *,'post> lon lat xpol ypol',real(xlon),real(ylat),real(xpol),real(ypol)
+        !  print *,'x y z',x,y,z
+        !endif  !! DEBUG
+      else if (ngrid.eq.-2) then      ! around south pole
+        xlon = real(xlon0+x*dx,kind=dbl)
+        ylat = real(ylat0+y*dy,kind=dbl)
+        call ll2polxySP(xlon,ylat,xpol,ypol)
+        xpol = xpol+real(dxsave,kind=dbl)
+        ypol = ypol+real(dysave,kind=dbl)
+        call polxy2llSP(xlon,ylat,xpol,ypol)
+        x = real((xlon-xlon0)/dx,kind=dp)
+        ! Achtung:  nx-1, not nx, means 360 degrees
+        if (x < 0) x = x + real(nx-1,kind=dp)
+        y = real((ylat-ylat0)/dy,kind=dp)
+      endif
       endif
 
 ! If global data are available, use cyclic boundary condition
@@ -892,18 +983,8 @@ contains
 
 !     nstop must be less or equal to 7 or change bound in timemanager
       
-      if(merra_data) then
-          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
-              (y.gt.nearest(float(ny)-0.5,1.)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
-             nstop=3
-             print *, 'stop parcel:trajectory terminated ',jp, ngrid
-             if (ngrid.ge.0) then
-                write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
-             else
-                write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
-             endif
-          endif
-      else if (jra55_data)  then
+
+      if (jra55_data)  then
           ! (90-ylat0)/dy=0.7675033...     1-0.7675033...=0.23249669...
           ! no reason to extend that to era5
           if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.-0.767504).or. &
@@ -916,6 +997,19 @@ contains
                 write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
              endif
           endif
+#if defined(MERRA)
+      else if(merra_data) then
+          if ((x.lt.nearest(0.,-1.)).or.(x.ge.nearest(float(nx-1),1.)).or.(y.lt.nearest(-0.5,-1.)).or. &
+              (y.gt.nearest(float(ny)-0.5,1.)).or.(z_motion.and.(z>zmax))) then   !trajectory terminated
+             nstop=3
+             print *, 'stop parcel:trajectory terminated ',jp, ngrid
+             if (ngrid.ge.0) then
+                write(*,'(9G14.5)') x,y,z,dxsave,dysave,w,u,v,dt
+             else
+                write(*,'(6g14.5)') x,y,dxsave,dysave,xpol,ypol
+             endif
+          endif   
+#endif
       else if (setxylim) then
           if (y.lt.ylmin) then
             nstop=3
