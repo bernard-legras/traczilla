@@ -1,9 +1,10 @@
 
 !**********************************************************************
 ! Copyright 2007, 2012, 2013                                          *
-! Bernard Legras                                                      *
+! Bernard Legras 
+! bernard.legras@lmd.ipsl.fr                                                     *
 !                                                                     *
-! This file is part of TRACZILLA which is derived from FLEXPART V6    *
+! This file is part of TRACZILLA which is derived from FLEXPART V6    *s
 !                                                                     *
 ! TRACZILLA is free software: you can redistribute it and/or modify   *
 ! it under the terms of the GNU General Public License as published by*
@@ -33,7 +34,6 @@ module mass_iso
 
 use commons
 use sphereharmSPE
-use coord
 implicit none
 save
 
@@ -117,7 +117,8 @@ end subroutine alloc_iso
 !                                                                     *
 !**********************************************************************
 
-  real(dp) :: sizesouth,sizenorth
+  use coord
+  real(dbl) :: sizesouth,sizenorth
   integer :: ifn, lf, Nt, Nlt, Nlg, jl
  
   logical :: error
@@ -175,19 +176,19 @@ end subroutine alloc_iso
   sglobal=.true.               ! field contains south pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizesouth=6.*(switchsouth+90.)/dy
-  call stlmbr(southpolemap,-90.,0.)
-  call stcm2p(southpolemap,0.,0.,switchsouth,0.,sizesouth, &
-  sizesouth,switchsouth,180.)
+  sizesouth=6.D0*(switchsouth+90.D0)/dy
+  call stlmbr(southpolemap,-90.D0,0.D0)
+  call stcm2p(southpolemap,0.D0,0.D0,switchsouth,0.D0,sizesouth, &
+  sizesouth,switchsouth,180.D0)
   switchsouthg=(switchsouth-ylat0)/dy
 ! Imposes north pole
   nglobal=.true.               ! field contains north pole
 ! Enhance the map scale by factor 3 (*2=6) compared to north-south
 ! map scale
-  sizenorth=6.*(90.-switchnorth)/dy
-  call stlmbr(northpolemap,90.,0.)
-  call stcm2p(northpolemap,0.,0.,switchnorth,0.,sizenorth, &
-  sizenorth,switchnorth,180.)
+  sizenorth=6.D0*(90.D0-switchnorth)/dy
+  call stlmbr(northpolemap,90.D0,0.D0)
+  call stcm2p(northpolemap,0.D0,0.D0,switchnorth,0.D0,sizenorth, &
+  sizenorth,switchnorth,180.D0)
   switchnorthg=(switchnorth-ylat0)/dy
   write(*,*)
   write(*,'(a,2i5,3L3)')' gribcheck_iso> nx,ny,xglobal,nglobal,sglobal ', &
@@ -225,7 +226,7 @@ end subroutine alloc_iso
   enddo
 ! Calculate associated Legendre functions on the regular grid
   do jl=1,nh_lat
-     call bsharm(plm(:,jl),sin(grid_lath(jl)*pi/180.),N_trunc)
+     call bsharm(plm(:,jl),sin(grid_lath(jl)*real(pi,kind=dp)/180.),N_trunc)
   enddo
   print *,'gribcheck_iso > Spectral initialization done'
   
@@ -489,9 +490,11 @@ end subroutine alloc_iso
 
   subroutine verttransform_iso(n)
   
+  use coord
   integer, intent(in):: n
   integer :: ix, jy, iz
-  real :: xlon, ylat, uupolaux, vvpolaux
+  real(dbl) :: xlon, ylat 
+  real(dp) :: uupolaux, vvpolaux
 
      if (nglobal) then
         do jy=int(switchnorthg)-2,ny-1
@@ -507,7 +510,7 @@ end subroutine alloc_iso
         enddo
         do iz=1,nuvz
           xlon=xlon0+float(nx/2-1)*dx
-          call cc2gll(northpolemap,90.,xlon,             &
+          call cc2gll(northpolemap,90.D0,xlon,             &
             uuh(nx/2-1,ny-1,iz,n),vvh(nx/2-1,ny-1,iz,n), &
             uupolaux,vvpolaux)
           uupol(0:nx-1,ny-1,iz,n)=uupolaux
@@ -528,7 +531,7 @@ end subroutine alloc_iso
         enddo
         do iz=1,nuvz
           xlon=xlon0+float(nx/2-1)*dx
-          call cc2gll(southpolemap,90.,xlon,             &
+          call cc2gll(southpolemap,90.D0,xlon,             &
             uuh(nx/2-1,0,iz,n),vvh(nx/2-1,0,iz,n), &
             uupolaux,vvpolaux)
             uupol(0:nx-1,0,iz,n)=uupolaux
