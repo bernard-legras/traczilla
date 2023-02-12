@@ -331,10 +331,12 @@ end subroutine alloc_era5
     ! map scale
     ! all polar transforms done in real*8
     sizesouth=6.d0*(switchsouth+90.d0)/dy
-    call stlmbr(southpolemap,-90.d0, 0.d0)
-    call stcm2p(southpolemap,0.d0,0.d0,switchsouth,0.d0,sizesouth, &
-    sizesouth,switchsouth,180.d0)
-    switchsouthg=(switchsouth-ylat0)/dy
+    if (oldpole) then
+      call stlmbr(southpolemap,-90.d0, 0.d0)
+      call stcm2p(southpolemap,0.d0,0.d0,switchsouth,0.d0,sizesouth, &
+      sizesouth,switchsouth,180.d0)
+    endif
+    switchsouthg=(real(switchsouth,kind=dp)-ylat0)/dy
     print *,'South pole in the grid'
   else
     sglobal=.false.
@@ -348,12 +350,12 @@ end subroutine alloc_era5
     ! map scale
     ! all polar transforms done in real*8
     sizenorth=6.d0*(90.d0-switchnorth)/dy
-    call stlmbr(northpolemap,90.d0, 0.d0)
-    print *,'stlmbr',northpolemap
-    call stcm2p(northpolemap,0.d0,0.d0,switchnorth,0.d0,sizenorth, &
-    sizenorth,switchnorth,180.d0)
-    print *,'stcm2p',northpolemap
-    switchnorthg=(switchnorth-ylat0)/dy
+    if (oldpole) then
+      call stlmbr(northpolemap,90.d0, 0.d0)
+      call stcm2p(northpolemap,0.d0,0.d0,switchnorth,0.d0,sizenorth, &
+      sizenorth,switchnorth,180.d0)
+    endif
+    switchnorthg=(real(switchnorth,kind=dp)-ylat0)/dy
     print *,'North pole in the grid'
   else
     nglobal=.false.
@@ -680,8 +682,7 @@ data bb  / &
  !    if z_motion, set memind_diab to memind for correct
  !    indexing of vertical velocities in the interpolation routine     
       else if (z_motion) then ifdiab
-         memind_diab=memind         
-      
+         memind_diab=memind
       endif ifdiab
 
       return
@@ -729,7 +730,7 @@ data bb  / &
   character (len=6) :: yearmonth
   character (len=8) :: fulldate
   integer :: igrib,iret
-  real(dp), allocatable :: values(:),vals(:,:)
+  real*4, allocatable :: values(:),vals(:,:)
    
 ! Finds the date from wfname
   !print *,'read_era5> wfname ',wfname(indj)
@@ -904,7 +905,7 @@ data bb  / &
   character (len=6) :: yearmonth
   character (len=8) :: fulldate
 !  integer :: OMP_GET_THREAD_NUM
-  real(dp), allocatable :: values(:),swr(:,:,:),lwr(:,:,:)
+  real*4, allocatable :: values(:),swr(:,:,:),lwr(:,:,:)
   integer :: igrib, iret
 ! Finds the date and time from wfname
   ll=len_trim(wfname_diab(indj))
@@ -976,15 +977,15 @@ data bb  / &
   subroutine verttransform_era5(n)
 
   use coord
+  use polarproj
   integer, intent(in):: n
-  integer :: ix, jy, iz
+  integer :: ix, jy, iz, magic
+  !pb real(dbl) :: xlon, ylat
   real(dbl) :: xlon, ylat
-  ! test
-  real(dbl) :: xlonr,ffpol,ddpol
-  real(dp) :: uuaux, vvaux, uupolaux, vvpolaux
 
 ! north pole region
   if (nglobal) then
+  if (oldpole) then
 #if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED) 
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(ix,jy,iz,xlon,ylat)
@@ -1004,7 +1005,6 @@ data bb  / &
 !$OMP END DO
 !$OMP END PARALLEL
 #endif
-
 ! As a temporary fix, the velocity at the pole in polar coordinates is
 ! replaced by the average over the closest latitude circle.
 ! Even id only the horizontal component is at trouble, we include the 
@@ -1014,11 +1014,25 @@ data bb  / &
       vvpol(0:nx-1,ny-1,iz,n) = sum(vvpol(0:nx-1,ny-2,iz,n))/nx
       wwh(0:nx-1,ny-1,iz,n) = sum(wwh(0:nx-1,ny-2,iz,n))/nx
     enddo
+! New interpolation method with polarproj
+  else
+    if (magicpole) then
+      if (uuh(0,ny-1,20,n) == uuh(int(nx/4),ny-1,20,n)) then
+        magic = 1
+      else
+        magic = 0
+      endif
+    else
+      magic = 2
+    endif
+    call uvinNpol(n,magic)
+  endif
    
   endif
 
 !    south pole region
   if (sglobal) then
+  if (oldpole) then
 #if defined(PAR_RUN)
 !$OMP PARALLEL DEFAULT(SHARED) 
 !$OMP DO SCHEDULE(DYNAMIC) PRIVATE(ix,jy,iz,xlon,ylat)
@@ -1048,8 +1062,22 @@ data bb  / &
       vvpol(0:nx-1,0,iz,n) = sum(vvpol(0:nx-1,1,iz,n))/nx
       wwh(0:nx-1,0,iz,n) = sum(wwh(0:nx-1,1,iz,n))/nx
     enddo
+  ! New interpolation method with polarproj
+  else
+    if (magicpole) then
+      if (uuh(0,0,20,n) == uuh(int(nx/4),0,20,n)) then
+        magic = 1
+      else
+        magic = 0
+      endif
+    else
+      magic = 2
+    endif
+    call uvinSpol(n,magic)
   endif
-  
+
+  endif
+
   return
   end subroutine verttransform_era5
  
@@ -1227,7 +1255,7 @@ data bb  / &
   allocate(area_coefft_era5(0:ny-1))
 ! it is assumed that dy = 180/(ny-1)
   do i=1,ny/2-1
-     area_coefft_era5(ny/2-1+i)=2*sin(pi*dy/180._dp)*cos((i-1/2)*dy*pi/180._dp)
+     area_coefft_era5(ny/2-1+i)=2*sin(pi*dy/180._dp)*cos((i-0.5)*dy*pi/180._dp)
      area_coefft_era5(ny/2-i)=area_coefft_era5(ny/2-1+i)
   enddo
   area_coefft_era5(0)=2*cos(ylat0*pi/180._dp)*sin((dy/2+90._dp+ylat0)*pi/180._dp)
