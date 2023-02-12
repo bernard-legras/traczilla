@@ -513,7 +513,7 @@ contains
 ! this sequences allow to read new savpos with idx_orgn 
 ! and set idx_orgn to 1 for the old version without orgn     
       read(unitpartin,err=45) numpart, r_plan, idx_orgn
-  40  go to 50
+      go to 50
   45  close(unitpartin)
       !unitpartin = unitpartin+100
       open(unitpartin,file=trim(path(2))//'savpos', &
