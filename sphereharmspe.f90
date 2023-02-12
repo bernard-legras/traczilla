@@ -1,6 +1,6 @@
 ! Copyright or © or Copr. Bernard Legras (1984,2006)
 
-! legras@lmd.ens.f
+! bernard.legras@lmd.ipsl.fr
 
 ! This software is a computer program whose purpose is to perform Legendre 
 ! transforms on the sphere.
