@@ -40,7 +40,8 @@ character(len=256) :: external_directory
 character(len=16) :: external_type
 
 private check_launch_time, check_numpart
-private check_input_date_2, check_sample
+private check_input_date_2
+!private check_sample
 private check_input_date_1, check_output_options, check_synchro, check_consist
 
 contains
@@ -78,8 +79,12 @@ contains
  use isentrop_h
  use ecmwf_diab
  use ecmwf_inct
+#if defined(ISO_MASS)
  use mass_iso
+#endif
+#if defined(MERRA)
  use merra
+#endif
  use jra55
  use era5
  use readinterpN, only : ecmwf_data 
@@ -136,19 +141,25 @@ contains
    lower_theta_level,   & ! lower level on which theta is calculated
    debug_out,           & ! test prints to check diabatic versus mass velocities
    perpetual,           & ! perpetual run
+#if defined(ISO_MASS)
    iso_mass,            & ! data on isentropic levels, mass equilibrated
    mass_diabat,         & ! use heating rates on isentropic levels
    mass_isent,          & ! isentropic motion from data on isentropic levels
+#endif
    mass_correction,     & ! heating rate correction to preserve mass conservation in the stratosphere
    mean_diab_output,    & ! Output of the mass averaged heating rate
+#if defined(MERRA)
    merra_data,          & ! merra winds
    merra_diab,          & ! merra heating rates
+#endif
    jra55_data,          & ! jra55 winds
    jra55_diab,          & ! jra55 heating rates
    era5_data,           & ! era5 winds
    era5_diab,           & ! era5 heating rates
    ecmwf_netcdf,        & ! ECMWF data are in netcdf4 format
-   hour_accu              ! number of hours in the ECMWF accumulations
+   hour_accu,           & ! number of hours in the ECMWF accumulations
+   oldpole,             & ! old behaviour at the pole using cfmap
+   magicpole             ! adapting the behaviour at the pole to what is found in the ERA5 data
    
 !Open the command file and read user options
 !-------------------------------------------
@@ -216,13 +227,17 @@ contains
  upper_theta_level=1000
  debug_out=.false.
  perpetual=.false.
+#if defined(ISO_MASS)
  iso_mass=.false.
  mass_diabat=.false.
  mass_isent=.false.
+#endif
  mass_correction=.false.
  mean_diab_output=.false.
+#if defined(MERRA)
  merra_data=.false.
  merra_diab=.false.
+#endif
  jra55_data=.false.
  jra55_diab=.false.
  era5_data=.false.
@@ -231,6 +246,8 @@ contains
  data_source='EI'
  ecmwf_netcdf=.false.
  hour_accu = 3
+ oldpole = .false.
+ magicpole = .true.
   
  read(unitcommand,NML=COMMAND)
  write(6,COMMAND)
@@ -254,8 +271,10 @@ contains
    data_source='EI'
  else if (jra55_data) then
    data_source='JRA55'
+#if defined(MERRA)
  else if (merra_data) then
    data_source='MERRA'
+#endif
  else if (era5_data) then
    data_source='ERA5'
  endif
@@ -331,7 +350,9 @@ contains
  print *,'readcommand > z_motion ',z_motion
  print *,'readcommand > isentropic_motion ',isentropic_motion
  print *,'readcommand > diabatic_w ',diabatic_w
+#if defined(MERRA)
  if (merra_data) print *,'readcommand > merra_data n _diab ',merra_data,merra_diab
+#endif
  if (jra55_data) print *,'readcommand > jra55_data n _diab ',jra55_data,jra55_diab 
  if (era5_data) print *,'readcommand > era5_data n _diab ',era5_data,era5_diab 
  print *,'readcommand > ecmwf_data _diabatic_w ',ecmwf_data,ecmwf_diabatic_w 
@@ -342,7 +363,9 @@ contains
  print *,'readcommand > theta_bounds ',theta_bounds,lower_theta_level,&
                                                    upper_theta_level
  print *,'readcommand > debug_out ',debug_out
+#if defined(ISO_MASS)
  print *,'readcommand > iso_mass mass_diabat ',iso_mass,mass_diabat
+#endif
  print *,'readcommand > mass_correction mean_diab_output ',mass_correction,mean_diab_output
  
 ! Conversion of format HHHMISS to seconds
@@ -511,7 +534,9 @@ contains
  !use lyapunov, only: activ_Lyapunov, height_scale, sheet_slope, delta_ver, &
  !   delta_hor, tau_orthog
  use isentrop_h
+#if defined(MASS_ISO)
  use mass_iso
+#endif
  implicit none
 
  integer i,k,indz
@@ -781,7 +806,11 @@ max_life_time=BIG_INT
     mesh_size_lat=mesh_size
     mesh_size_long=mesh_size
     uppertheta=2485.30_dp
+#if defined(ISO_MASS)
     if(iso_mass .or. diabatic_w .or. isentropic_motion) then
+#else
+    if(diabatic_w .or. isentropic_motion) then
+#endif
         delayed_initialization=.true.
         press2theta=.true.
     endif
@@ -976,7 +1005,11 @@ max_life_time=BIG_INT
     ypoint1(1)=lat_min;  ypoint2(1)=lat_max
     nsample(1)=n_sample
     if(press_l > 0.) then
+#if defined(ISO_MASS)
       if(iso_mass .or. diabatic_w .or. isentropic_motion) then
+#else
+      if(diabatic_w .or. isentropic_motion) then
+#endif
         delayed_initialization=.true.
         press2theta=.true.
       endif
@@ -1305,14 +1338,14 @@ end subroutine readreleasesB2
       return
       end function check_input_date_2
       
-      subroutine check_sample ()
-      if (n_sample > 1) then
-        write(*,*) 'TRACZILLA WARNING'
-        write(*,*) 'n_sample forced to 1'
-        n_sample = 1
-      endif
-      return
-      end subroutine check_sample
+      !subroutine check_sample ()
+      !if (n_sample > 1) then
+      !  write(*,*) 'TRACZILLA WARNING'
+      !  write(*,*) 'n_sample forced to 1'
+      !  n_sample = 1
+      !endif
+      !return
+      !end subroutine check_sample
       
       subroutine check_sav
       if(savfull .and. loutsav<BIG_INT) then
@@ -1420,11 +1453,10 @@ end subroutine readreleasesB2
 !                                                                              *
 !*******************************************************************************
 
-      real xc,yc, zc, epsil, epsil2, ylat, pint, lev 
+      real xc,yc, epsil, epsil2, ylat
       real corrected_mesh_size
-      integer idummy,i,j,it,numparti,count_lon,jl,jy,indz,ix,jyps
+      integer idummy,i,j,it,numparti,count_lon
       integer nb_points_latcircle
-      real ddx, ddy, rddx, rddy, p1, p2, p3, p4, psurf
       logical error
       data idummy/-7/
 
@@ -1576,9 +1608,10 @@ subroutine set_temp_for_theta(error)
   use isentrop_h
   use readinterpN, only : ecmwf_data
   use jra55, only : jra55_data
-  use merra, only : merra_data,merra_diab 
+#if defined(MERRA)
+  use merra, only : merra_data,merra_diab   
+#endif
   use era5, only : era5_data
-  
   logical, intent(out):: error
   real(dp), allocatable :: logzp(:),logpzp(:),mtab(:)
   real(dp), allocatable :: log_press_prof(:), log_theta_prof(:), temp_prof(:)
@@ -1632,10 +1665,12 @@ subroutine set_temp_for_theta(error)
          call calc_col_theta(ix+1,jy,1)
          call calc_col_theta(ix,jy+1,1)
          call calc_col_theta(ix+1,jy+1,1)
+#if defined(MERRA)
       else if (merra_diab) then
          print *,'ERROR set_temp_for_theta'
          error=.true.
-         return  
+         return
+#endif
       endif   
       ! Calculate pressure column 
       ! Works for ERA5, JRA55 and ERA-Int
@@ -1703,17 +1738,19 @@ subroutine set_temp_for_press(error)
 !*******************************************************************************   
   
   use isentrop_h
-  use readinterpN, only : ecmwf_data
-  use jra55, only : jra55_data
-  use merra, only : merra_data 
-  use era5, only:era5_data
+  !use readinterpN, only : ecmwf_data
+  !use jra55, only : jra55_data
+#if defined(MERRA)
+  !use merra, only : merra_data
+#endif 
+  !use era5, only:era5_data
   
   logical, intent(out) :: error
   real(dp), allocatable :: logzp(:)
   real(dp), allocatable :: log_z_prof(:), temp_prof(:)
-  real(dp):: psaver, errm
+  real(dp):: psaver
   integer :: i,ix,jy,nblevel
-  real(dp) :: p1,p2,p3,p4,ddx,ddy,rddx,rddy
+  real(dp) :: p1,p2,p3,p4,ddx,ddy, rddx,rddy
     
   allocate (log_z_prof(lower_theta_level:upper_theta_level))
   ! notice the non-orthodox usage of lower_theta_level and upper_theta_level
@@ -1734,8 +1771,9 @@ subroutine set_temp_for_press(error)
 ! one per one without taking vertical distribution into account when
 ! there is more than one layer 
   dopart: do i=1,numpart
-     if(xglobal) ix=modulo(floor(xtra1(i)),nx-1)       
-      jy=max(min(floor(ytra1(i)),ny-1),-1)
+      ix = int(floor(xtra1(i)))
+      if(xglobal) ix=modulo(floor(xtra1(i)),nx-1)       
+      jy=max(min(floor(ytra1(i)),ny-1),0)
       ddx=modulo(xtra1(i)-float(ix),1.)
       ! accounts for the two polar regions in JRA55
       ! the case should not occur for EI since 0 <= yt <= ny-1
@@ -2075,8 +2113,10 @@ end subroutine set_temp_for_press
 ! Variables:                                                                   *
 !                                                                              *
 !*******************************************************************************
- 
+
+#if defined(MASS_ISO) 
       use mass_iso
+#endif
 
       real xc,yc, epsil, epsil2, ylat
       real theta, thetamax,thetamin,thetainf,thetasup
@@ -2092,11 +2132,13 @@ end subroutine set_temp_for_press
       epsil =  1.e-4 ; epsil2 = 1.e-7
       thetamin=10000._dp ; thetamax=0._dp
 
+#if defined(ISO_MASS)
       if(iso_mass) then
         print *,'fixpresslayerpart does not allow to set pressure'
         print *,'in a iso mass run' 
         stop
       endif
+#endif
 
       numpart=0 
       print *,'numpoint ',numpoint
@@ -2648,8 +2690,10 @@ end subroutine set_temp_for_press
    select case (data_source)
      case ('EI')
        tropofile=trim(tropodir)//'/tropo-theta-EI-'//yyyy//'.bin'
+#if defined(MERRA)
      case ('MERRA')
        tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//yyyy//'.bin'
+#endif
      case ('JRA55')
        tropofile=trim(tropodir)//'/tropo-theta-JRA-'//yyyy//'.bin'
      case ('ERA5')
@@ -2812,7 +2856,7 @@ end subroutine set_temp_for_press
 !                                                                              *
 !*******************************************************************************
  use jra55
- real (dp) :: xc,yc,zc, epsil,epsil2, ylat, xlm
+ real (dp) :: xc,yc, epsil,epsil2, ylat, xlm
  real (dp) :: corrected_mesh_size, ddx, ddy
  real (dbl) :: datef
  real (dp), allocatable :: tropoz(:,:,:),buff(:)
@@ -2909,8 +2953,10 @@ end subroutine set_temp_for_press
    select case (data_source)
      case ('EI')
        tropofile=trim(tropodir)//'/tropo-theta-EI-'//year//'.bin'
+#if defined(MERRA)
      case ('MERRA')
        tropofile=trim(tropodir)//'/tropo-theta-MERRA-'//year//'.bin'
+#endif
      case ('JRA55')
        tropofile=trim(tropodir)//'/tropo-theta-JRA-'//year//'.bin'
      case ('ERA5')
@@ -3304,7 +3350,7 @@ end subroutine set_temp_for_press
 ! use lyapunov, only: numpart_np, activ_Lyapunov
        
  real, allocatable, dimension(:) :: timeO3, UTGPS, GMTMM,  &
-      off_jul,interp_time, &
+      interp_time, &
       interp_xtra1, interp_ytra1, interp_ztra1, &
       F_z, F_lat, F_long
  
@@ -3312,7 +3358,6 @@ end subroutine set_temp_for_press
       DaltGPS, DlatGPS, DLongGPS, QGPS, TedrGPS, ReynGPS, &
       PStaMM, TstaMM, ThtaMM, UMM, VMM, WMM
  
- character(len=96):: line
  logical, intent(out):: error
  logical do_rel,stop_loop
  integer lhead, FDate, YYYY, MM, DD
@@ -3993,7 +4038,7 @@ end subroutine set_temp_for_press
  real, allocatable, dimension(:) :: UTC,  &
       interp_time, &
       interp_xtra1, interp_ytra1, interp_ztra1, interp_ttra1, &
-      F_Pstat, F_Tout, F_Alt, F_Lat, F_Lon, F_Halt, F_z
+      F_Pstat, F_Tout, F_Alt, F_Lat, F_Lon, F_z
  
  logical, intent(out):: error
  integer lhead, FDate, YYYY, MM, DD
@@ -4382,7 +4427,7 @@ case ('BAL')
    F_z(j) = -log(F_press(j)/p0)
  enddo
  do j=1,nobs
-   off_jul(j)=julian_date(j)-julian_date(1)
+   off_jul(j)=real(julian_date(j)-julian_date(1),kind=dp)
  enddo
  
  numpart = n_loc * n_sample
@@ -4393,7 +4438,7 @@ case ('BAL')
  allocate(interp_time(n_loc))
  allocate(interp_xtra1(n_loc),interp_ytra1(n_loc),interp_ztra1(n_loc))
  do i=1,n_loc
-   interp_time(i) = (i-1)*(julian_date(nobs)-julian_date(1))/(n_loc-1)
+   interp_time(i) = real((i-1)*(julian_date(nobs)-julian_date(1))/(n_loc-1),kind=dp)
  enddo
  print *,julian_date(1),julian_date(2),julian_date(3)
  print *,off_jul(1),off_jul(nobs)
@@ -4648,7 +4693,9 @@ case ('BAL')
     !*******************************************************************************
     
     use commons
+#if defined(MASS_ISO)
     use mass_iso
+#endif
 
     implicit none
 
@@ -4664,7 +4711,7 @@ case ('BAL')
     
     integer                                   :: ibhourtrac, ibmintrac, ibsectrac
     integer                                   :: ibyeartrac, ibmonthtrac, ibdaytrac
-    integer                                   :: hourtrac, mintrac, sectrac
+    integer                                   :: hourtrac
     integer                                   :: yeartrac, monthtrac, daytrac
     integer                                   :: iehourtrac
     integer                                   :: ieyeartrac, iemonthtrac, iedaytrac
@@ -4782,8 +4829,7 @@ case ('BAL')
           else
              ztra1(numpart_prev) = zpart(ipart)
           endif
-          itra1(numpart_prev) = ir_start(ipart)
-          !if(numpart_prev==1148648) then
+          itra1(numpart_prev) = int(ir_start(ipart))
           !  write(*,*) 'fixparticlesCLAUS'
           !  write(*,*) 'numpart_prev = 1148648'
           !  write(*,*) 'ttra1=',thetapart(ipart)*(p0/presspart(ipart))**(-kappa)
@@ -5079,7 +5125,9 @@ case ('BAL')
 ! May 2016: B. Legras
       
   use commons
+#if defined(MASS_ISO)
   use mass_iso
+#endif
 
   implicit none
 
@@ -5398,7 +5446,9 @@ case ('BAL')
 ! November 2016: B. Legras
       
   use commons
+#if defined(MASS_ISO)
   use mass_iso
+#endif
   use date
 
   implicit none
@@ -5424,13 +5474,12 @@ case ('BAL')
   character(3)  :: Tbmax_string
   integer :: ios, ipart
   logical :: test_exist 
-  integer :: nss(4),outofrange, i, j, jc, irmin, irmax, numpart0 
-  integer (kind=4) :: lhead, infmt, mode, naktiv, idx_orgn_s, &
-                     numpart_s, numpart_s0
+  integer :: nss(4),outofrange, i, j, irmin, irmax
+  integer (kind=4) :: lhead, infmt, mode, numpart_s
   character(10) :: fulldate_cloudtop_string 
   real (kind=8) :: real_date, &
                    julian_date, julian_date_beg, julian_date_end
-  integer :: current_fulldate_cloudtop
+  !integer :: current_fulldate_cloudtop
   integer (kind=4) :: yyyymmdd, hh, hhmmss, offs, nbread, numx               
   
   ! --- Init ---
