@@ -127,7 +127,7 @@ module commons
 
       integer, parameter :: maxpart=25000000,maxpoint=50,maxspec=1
 !     integer, parameter :: maxpart=3000000,maxpoint=50,maxspec=1
-      integer, parameter :: maxwf=150000,maxtable=1000,numclass=9,ni=11
+      integer, parameter :: maxwf=15000,maxtable=1000,numclass=9,ni=11
 
 ! maxpart                 Maximum number of particles
 ! maxpoint                Maximum number of release locations
@@ -577,6 +577,9 @@ module commons
 !     southpolemap,northpolemap L  define stereographic projections
 !                         at the two poles
 
+!     options for the new polar projection replacing the infamous cfmap
+      logical :: oldpole, magicpole
+
 !***************************************
 ! Variables characterizing each particle
 !***************************************
@@ -608,7 +611,7 @@ module commons
 ! Random number field
 !********************
 
-      real(dp) :: rannumb(maxrand)
+      !real(dp) :: rannumb(maxrand)
 
 ! rannumb                 field of normally distributed random numbers
 
