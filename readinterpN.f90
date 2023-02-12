@@ -399,7 +399,8 @@ contains
    integer :: kumin,kumax,kwmin,kwmax
    real (kind=4) :: xaux1,xaux2,yaux1,yaux2
    real (kind=8) :: xaux1in,xaux2in,yaux1in,yaux2in
-   real :: sizesouth,sizenorth,xauxa
+   real (dbl) :: sizesouth,sizenorth
+   real (dp) :: xauxa
 
 ! VARIABLES AND ARRAYS NEEDED FOR GRIB DECODING
 
@@ -551,11 +552,11 @@ contains
           sglobal=.true.               ! field contains south pole
           ! Enhance the map scale by factor 3 (*2=6) compared to north-south
           ! map scale
-          sizesouth=6.*(switchsouth+90.)/dy
-          call stlmbr(southpolemap,-90.,0.)
-          call stcm2p(southpolemap,0.,0.,switchsouth,0.,sizesouth, &
-            sizesouth,switchsouth,180.)
-          switchsouthg=(switchsouth-ylat0)/dy
+          sizesouth=6.D0*(switchsouth+90.D0)/dy
+          call stlmbr(southpolemap,-90.D0,0.D0)
+          call stcm2p(southpolemap,0.D0,0.D0,switchsouth,0.D0,sizesouth, &
+            sizesouth,switchsouth,180.D0)
+          switchsouthg=(real(switchsouth,kind=dp)-ylat0)/dy
         else
           sglobal=.false.
           switchsouthg=999999.
@@ -565,11 +566,11 @@ contains
           nglobal=.true.               ! field contains north pole
           ! Enhance the map scale by factor 3 (*2=6) compared to north-south
           ! map scalecall 
-          sizenorth=6.*(90.-switchnorth)/dy
-          call stlmbr(northpolemap,90.,0.)
-          call stcm2p(northpolemap,0.,0.,switchnorth,0.,sizenorth, &
-             sizenorth,switchnorth,180.)
-          switchnorthg=(switchnorth-ylat0)/dy
+          sizenorth=6.*(90.D0-switchnorth)/dy
+          call stlmbr(northpolemap,90.D0,0.D0)
+          call stcm2p(northpolemap,0.D0,0.D0,switchnorth,0.D0,sizenorth, &
+             sizenorth,switchnorth,180.D0)
+          switchnorthg=(real(switchnorth,kind=dp)-ylat0)/dy
         else
           nglobal=.false.
           switchnorthg=999999.
@@ -1051,8 +1052,10 @@ contains
    !character(len=256) :: fname, lock_file
    !logical :: exfile,exlock
    !integer :: cc
-      
+
+#if defined(PAR_RUN)      
    integer :: OMP_GET_NUM_THREADS
+#endif
 
    levdiff2=nlev_ec-nwz+1
    allocate (zsec4(jpunp))
@@ -1392,7 +1395,8 @@ contains
    use coord
    integer :: ix,jy,iz,n,ix1,jy1,ixp,jyp,ixi,nold
    real :: pint,pb,pt,pih,ut,vt,ub,vb
-   real :: xlon,ylat,xlonr
+   real(dbl) :: xlon,ylat
+   real :: xlonr
    real :: uupolaux,vvpolaux,wdummy
    real :: dPsdx,dPsdy,dPsdt,uint,vint
 
@@ -1526,9 +1530,9 @@ contains
 ! modified because the original version, though correct, was totally crazy
      do iz=nuvz_b,nuvz
        xlon=xlon0+float(nx/2-1)*dx
-       xlonr=xlon*pi/180.
+       xlonr=real(xlon,kind=dp)*pi/180.
        jy=ny-1
-       call cc2gll(northpolemap,90.,xlon,             &
+       call cc2gll(northpolemap,90.D0,xlon,             &
             uuh(nx/2-1,jy,iz,n),vvh(nx/2-1,ny-1,iz,n), &
             uupolaux,vvpolaux)
        do ix=0,nx-1
@@ -1574,9 +1578,9 @@ contains
      do iz=nuvz_b,nuvz
 ! CALCULATE FFPOL, DDPOL FOR CENTRAL GRID POINT
        xlon=xlon0+float(nx/2-1)*dx
-       xlonr=xlon*pi/180.
+       xlonr=real(xlon,kind=dp)*pi/180.
        jy=0
-       call cc2gll(southpolemap,-90.,xlon,      &
+       call cc2gll(southpolemap,-90.D0,xlon,      &
          uuh(nx/2-1,jy,iz,n),vvh(nx/2-1,0,iz,n), &
             uupolaux, vvpolaux)
        do ix=0,nx-1
