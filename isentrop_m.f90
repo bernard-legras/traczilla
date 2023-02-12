@@ -437,37 +437,37 @@ subroutine interpol_wind_theta   &
       return
 
 !************************************
-      contains
+      !contains
 !************************************      
   
       ! unused routine at the moment
       ! provides in i0, y0 the coordinates of the closest
       ! point
-      subroutine sort_hor_dist()
-      if (p2<p1) then
-         if (p3<p1) then
-            if (p4<p1) then
-               i0=ix ; j0=jy; idxy=1
-            else
-               i0=ixp ; j0=jyp; idxy=4
-            endif
-         elseif (p4<p3) then
-            i0=ixp; j0=jy; idxy=3
-         else
-            i0=ixp; j0=jyp; idxy=4
-         endif
-      elseif (p3<p2) then  
-         if (p2<p4) then
-            i0=ixp; j0=jyp; idxy=4
-         else 
-            i0=ix; j0=jyp; idxy=2 
-         endif
-      elseif (p4<p3) then
-         i0=ixp ; j0=jy; idxy=3
-      else
-         i0=ixp ; j0=jyp; idxy=4
-      endif
-      end subroutine sort_hor_dist
+      !subroutine sort_hor_dist()
+      !if (p2<p1) then
+      !   if (p3<p1) then
+      !      if (p4<p1) then
+      !         i0=ix ; j0=jy; idxy=1
+      !      else
+      !         i0=ixp ; j0=jyp; idxy=4
+      !      endif
+      !   elseif (p4<p3) then
+      !      i0=ixp; j0=jy; idxy=3
+      !   else
+      !      i0=ixp; j0=jyp; idxy=4
+      !   endif
+      !elseif (p3<p2) then  
+      !   if (p2<p4) then
+      !      i0=ixp; j0=jyp; idxy=4
+      !   else 
+      !      i0=ix; j0=jyp; idxy=2 
+      !   endif
+      !elseif (p4<p3) then
+      !   i0=ixp ; j0=jy; idxy=3
+      !else
+      !   i0=ixp ; j0=jyp; idxy=4
+      !endif
+      !end subroutine sort_hor_dist
 
    end subroutine interpol_wind_theta
 
