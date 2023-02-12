@@ -364,7 +364,7 @@ end subroutine alloc_jra55
     call stlmbr(southpolemap,-90.D0,0.D0)
     call stcm2p(southpolemap,0.D0,0.D0,switchsouth,0.D0,sizesouth, &
     sizesouth,switchsouth,180.D0)
-    switchsouthg=(switchsouth-ylat0)/dy
+    switchsouthg=(real(switchsouth,kind=dp)-ylat0)/dy
   else
     sglobal=.false.
     switchsouthg=999999._dp
@@ -379,7 +379,7 @@ end subroutine alloc_jra55
     call stlmbr(northpolemap,90.D0,0.D0)
     call stcm2p(northpolemap,0.D0,0.D0,switchnorth,0.D0,sizenorth, &
     sizenorth,switchnorth,180.D0)
-    switchnorthg=(switchnorth-ylat0)/dy
+    switchnorthg=(real(switchnorth,kind=dp)-ylat0)/dy
   else
     nglobal=.false.
     switchnorthg=999999._dp
@@ -1296,7 +1296,7 @@ end subroutine alloc_jra55
   allocate(area_coefft_jra55(0:ny-1))
 ! it is assumed that dy = 180/(ny-1)
   do i=1,ny/2-1
-     area_coefft_jra55(ny/2-1+i)=2*sin(pi*dy/180._dp)*cos((i-1/2)*dy*pi/180._dp)
+     area_coefft_jra55(ny/2-1+i)=2*sin(pi*dy/180._dp)*cos((i-0.5_dp)*dy*pi/180._dp)
      area_coefft_jra55(ny/2-i)=area_coefft_jra55(ny/2-1+i)
   enddo
   area_coefft_jra55(0)=2*cos(ylat0*pi/180._dp)*sin((dy/2+90._dp+ylat0)*pi/180._dp)
