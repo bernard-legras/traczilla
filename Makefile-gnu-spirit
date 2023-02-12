@@ -1,0 +1,58 @@
+#$Id:
+# Modules to be loaded before running this make (in this order)
+# gcc/11.2.0
+#
+#=======================================================================
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+TARGET=win
+HOME=/home/legras
+
+SHELL = /bin/bash
+FC = gfortran
+CC = gcc
+
+ECCODES = $(HOME)/ecmwf/eccodes-gfortran-spirit
+#NETCDF = /net/nfs/tools/u20/22.3/PrgEnv/gcc/linux-ubuntu20.04-zen2/netcdf-fortran/4.5.3-gcc-11.2.0-3jjyaghemgcsznekroi44pspxbqvkvdx
+#COMLIB = $(HOME)/BProj/lib
+
+ifeq ($(TARGET),win)
+  MAIN = TRACZILLA-gnu-spirit
+  FFLAGS = -O3 -std=f2008 -cpp -Wall -fdec-math -fconvert=swap -fall-intrinsics -finit-real=nan -ffpe-trap=invalid,zero,overflow,underflow -fmax-errors=20 -I $(ECCODES)/include
+  # Quite strangely, the next line leads to loader failure
+  #LDFLAGS1 = -L$(NETCDF)/lib -lnetcdf -lnetcdff -L$(COMLIB) -lcom-x64-gnu-spirit -L$(ECCODES)/lib -leccodes_f90 -leccodes
+  # whereas this one works. Are we picking up the right library? This should be checked in a application that really uses netcdf 
+  LDFLAGS1 = -fdec-math -L$(ECCODES)/lib -leccodes_f90 -leccodes
+endif
+
+.SUFFIXES :	.f90
+
+.f90.mod:
+	        $(FC) $(FFLAGS) -c $<
+
+.f90.o:
+	$(FC) $(FFLAGS) -c $<
+
+#
+OBJECTS0 = commons.mod date.mod coord.mod thermo.mod randme.mod io.mod interpol.mod\
+polarproj.mod isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterpN.mod\
+ecmwf_inct.mod jra55.mod era5.mod combin.mod \
+demar.mod advect.mod
+
+OBJECTS1 =  TRACZILLA.o
+
+OBJECTS2 = misc.o
+
+$(MAIN): $(OBJECTS0) $(OBJECTS1) $(OBJECTS2)
+	$(FC) *.o -o $(MAIN) $(FFLAGS) $(LDFLAGS1)
+$(OBJECTS1): $(OBJECTS0) $(OBJECTS2)
+
+.PHONY : clean
+clean:
+	\rm *.o 
+	\rm *.mod  
+
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+#$Log: 

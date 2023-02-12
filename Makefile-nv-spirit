@@ -1,0 +1,61 @@
+#$Id:
+# Necessary modules (in this orde) 
+# module load nvhpc/21.9
+# no module load netcdf-fortran/4.5.3
+#=======================================================================
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ TRACZILLA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+TARGET=X64-par-ng
+HOME=/home/legras
+
+SHELL = /bin/bash
+FC       = nvfortran
+CC	= nvc
+
+#NETCDF = /net/nfs/tools/u20/22.3/PrgEnv/nvhpc/linux-ubuntu20.04-zen2/netcdf-fortran/4.5.3-nvhpc-21.9-wygpmchjtzne6xd7hh2hu6gukasydjb4
+ECCODES = $(HOME)/ecmwf/eccodes-nvfortran-spirit
+COMLIB = $(HOME)/BProj/lib
+LDFLAGS1 = -L$(ECCODES)/lib -leccodes_f90 -leccodes
+
+ifeq ($(TARGET),X64-par-ng)
+  MAIN = TRACZILLA-TT-nv-par-spirit
+  CFLAGS = -mp=multicore -fastsse -tp px -O2 -Minfo -Minline -Ktrap=divz,ovf -Msmartalloc
+  FFLAGS = -Mpreprocess -DPAR_RUN -mp=multicore -Munixlogical -Mextend -byteswapio -tp px -O2 -fastsse -Minfo -Mcache_align -Msmartalloc -Ktrap=divz,ovf -I$(ECCODES)/include
+endif
+ifeq ($(TARGET),X64-ng)
+  MAIN = TRACZILLA-TT-nv-spirit
+  CFLAGS = -fastsse -tp px -O2 -Minfo -fast -Minline -Ktrap=divz,ovf  -Mcache_align -Msmartalloc
+  FFLAGS = -Mpreprocess -Mextend -Munixlogical -byteswapio -tp px -fast -O2 -Minfo -Minline -Ktrap=divz,ovf -Mcache_align -Msmartalloc -I$(ECCODES)/include
+  #FFLAGS = -Mpreprocess -Mextend -Munixlogical -Mbounds -byteswapio -tp px -fast -O2 -Minfo -Minline -Ktrap=divz,ovf -Mcache_align -Msmartalloc -I$(ECCODES)/include
+endif
+
+.SUFFIXES :	.f90
+
+.f90.mod:
+	        $(FC) $(FFLAGS) -c $<
+
+.f90.o:
+	$(FC) $(FFLAGS) -c $<
+
+#
+OBJECTS0 = commons.mod date.mod coord.mod thermo.mod randme.mod io.mod interpol.mod\
+polarproj.mod isentrop_h.mod isentrop_m.mod ecmwf_diab.mod readinterpN.mod\
+ecmwf_inct.mod jra55.mod era5.mod combin.mod \
+demar.mod advect.mod
+
+OBJECTS1 =  TRACZILLA.o
+
+OBJECTS2 = misc.o 
+
+$(MAIN): $(OBJECTS0) $(OBJECTS1) $(OBJECTS2)
+	$(FC) *.o -o $(MAIN) $(FFLAGS) $(LDFLAGS1)
+$(OBJECTS1): $(OBJECTS0) $(OBJECTS2)
+
+.PHONY : clean
+clean:
+	\rm *.o 
+	\rm *.mod  
+#=====|==1=========2=========3=========4=========5=========6=========7==
+#
+#$Log:
