@@ -14,9 +14,10 @@
 ! to generate uupol and vvpol from uuh and vvh 
 
 module coord
+use commons
 implicit none
-integer, parameter:: dbl=kind(0.d0),dp=kind(0.0),sp=kind(0.0)
-REAL(dbl), PARAMETER :: PI=3.14159265358979D0,RADPDG=PI/180,DGPRAD=180/PI
+!integer, parameter:: dbl=kind(0.d0),dp=kind(0.0),sp=kind(0.0)
+REAL(dbl), PARAMETER :: PIL=3.14159265358979D0,RADPDG=PIL/180,DGPRAD=180/PIL
 REAL(dbl), PARAMETER :: REARTH=6367.47D0
 REAL(dbl), PARAMETER :: ALMST1=.9999999D0
 contains
@@ -181,7 +182,7 @@ contains
        REAL(dp), INTENT(IN) :: UE, VN
 
        ALONG = CSPANF( XLONG - STRCMP(2), -180.D0, 180.D0)
-       !* The following paragraph assumes the pole line cotains two fixed values
+       !* The following paragraph assumes the pole line contains two fixed values
        !* which are the pole wind given according to WMO rule
        ! if (xlat.gt.89.985D0) then
        !*  North polar meteorological orientation: "north" along prime meridian
@@ -193,22 +194,22 @@ contains
        !  rot = - strcmp(1) * along
        !endif
        !* When the pole line is a double sinusoid in quadrature in continuity with
-       !* neighbour latitudes, we use the ansatz (It is not totally clear this
-       !* is correct but at least it avoids parcels to stick at the pole)
+       !* neighbour latitudes, we use the ansatz (It is not
+       !* correct but at least it avoids parcels to stick at the pole)
        ROT = - STRCMP(1) * ALONG
 
        SLONG = SIN( RADPDG * ROT )
        CLONG = COS( RADPDG * ROT )
        XPOLG = SLONG * STRCMP(5) + CLONG * STRCMP(6)
        YPOLG = CLONG * STRCMP(5) - SLONG * STRCMP(6)
-       UG = YPOLG * UE + XPOLG * VN
-       VG = YPOLG * VN - XPOLG * UE
+       UG = REAL(YPOLG * UE + XPOLG * VN, kind=dp)
+       VG = REAL(YPOLG * VN - XPOLG * UE, kind=dp)
        RETURN        
        END SUBROUTINE CC2GLL
 
-       REAL(dbl) FUNCTION CGSZLL (STRCMP, XLAT,XLONG)
+       REAL(dbl) FUNCTION CGSZLL (STRCMP, XLAT)
 !*  WRITTEN ON 3/31/94 BY Dr. Albion Taylor  NOAA / OAR / ARL
-       REAL(dbl), INTENT(IN) :: STRCMP(9), XLAT, XLONG
+       REAL(dbl), INTENT(IN) :: STRCMP(9), XLAT
        REAL(dbl) SLAT,YMERC,EFACT
        IF (XLAT .GT. 89.985D0) THEN
 !* CLOSE TO NORTH POLE
@@ -429,7 +430,7 @@ contains
        STRCMP (6) = - SIN (TURN)
        STRCMP (7) = 1.D0
        STRCMP (7) = GRIDSZ * STRCMP(7)            &
-                   / CGSZLL(STRCMP, XLATG, STRCMP(2))
+                   / CGSZLL(STRCMP, XLATG)
        CALL CLL2XY (STRCMP, XLAT1,XLONG1, X1A,Y1A)
        STRCMP(3) = STRCMP(3) + X1 - X1A
        STRCMP(4) = STRCMP(4) + Y1 - Y1A
@@ -514,8 +515,8 @@ contains
 !                                                                     *
 !**********************************************************************
 
-      use commons
-      implicit none
+      !use commons
+      !implicit none
 
       integer i,j
       logical error
