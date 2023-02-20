@@ -852,11 +852,19 @@ contains
 ! Add random vertical/horizontal component to the displacement
 !=============================================================
        
-      if((nsample(1) > 1).and.(.not.switch_diff_off)) then
-        do i = 1,nss
-          harvest(i) = ran1(seed(num_thread))
-        enddo
-        !call random_number(harvest)
+      ! Assuming that if verdiff or hordiff are true, diffusion 
+      ! must be done whatever is the sampling
+      ! old version based on the nsample flag
+      ! if((nsample(1) > 1).and.(.not.switch_diff_off)) then
+      ! new version
+      !print jp,switch_diff_off,verdiff,hordiff
+      if ((verdiff.or.hordiff).and.(.not.switch_diff_off)) then
+        ! We come back to the random_number generator
+        !do i = 1,nss
+          !harvest(i) = ran1(seed(num_thread))
+          !harvest(i) = 0.
+        !enddo
+        call random_number(harvest)
         wdiff=2*sum(harvest) - nss
         wdiff = wdiff*sqrt(6*diffus/(nss*dt))
         if(verdiff) z=z+wdiff*dt*float(ldirect)*z_factor
@@ -865,8 +873,8 @@ contains
         ! is is not consistent and this option should not be used when
         ! parcels travel in these regions.
         if(hordiff) then
-          rand_angle = ran1(seed(num_thread))
-          !call random_number(rand_angle)
+          !rand_angle = ran1(seed(num_thread))
+          call random_number(rand_angle)
           rand_angle=2*pi*rand_angle
           dxsave = dxsave + wdiff*dt*cos(rand_angle)
           dysave = dysave + wdiff*dt*sin(rand_angle)
